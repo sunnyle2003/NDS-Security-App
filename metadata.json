@@ -1,0 +1,6 @@
+{
+  "name": "Security App",
+  "description": "Ứng dụng chuyên biệt cho quy trình vận hành công ty bảo vệ Ngày & Đêm.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
