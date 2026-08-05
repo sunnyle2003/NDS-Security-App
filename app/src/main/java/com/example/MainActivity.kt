@@ -64,6 +64,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.SubcomposeAsyncImage
 import com.example.data.model.Proposal
 import com.example.data.model.User
+import com.example.data.model.Violation
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.theme.SuccessColor
 import com.example.ui.theme.ErrorColor
@@ -140,6 +141,7 @@ fun SecurityAppMain(
                             "ADMIN" -> AdminDashboardScreen(user = user, viewModel = viewModel)
                             "CAPTAIN" -> CaptainDashboardScreen(user = user, viewModel = viewModel)
                             "OFFICER" -> OfficerDashboardScreen(user = user, viewModel = viewModel)
+                            "DISCIPLINE" -> DisciplineDashboardScreen(user = user, viewModel = viewModel)
                         }
                     }
                 }
@@ -312,56 +314,6 @@ fun LoginScreen(viewModel: SecurityViewModel) {
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                         )
                     }
-                }
-            }
-
-            // Info guide banner for registration-free and defaults
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
-                ),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = "Guide",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = "Hướng dẫn Vận hành",
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    Text(
-                        text = "• Phân quyền CCCD: Số CCCD của nhân viên phải được Admin cấp quyền trước trên hệ thống.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                    Text(
-                        text = "• Đăng nhập lần đầu: Sau khi Admin cấp quyền, nhân viên đăng nhập bằng CCCD của mình để tự thiết lập Họ tên & Mật khẩu riêng tư.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                    Text(
-                        text = "• Quản trị viên (Admin): CCCD: 000000000000, Mật khẩu: admin123 (Đăng nhập dùng ngay không cần thiết lập).",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                    Text(
-                        text = "• Đội trưởng & Cán bộ mẫu (Đã thiết lập sẵn):\n  - Đội trưởng mẫu: 111111111111 (Mật khẩu: nds123)\n  - CB Nghiệp vụ mẫu: 222222222222 (Mật khẩu: nds456)",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
                 }
             }
         }
@@ -675,8 +627,24 @@ fun FirstTimeSetupScreen(cccd: String, viewModel: SecurityViewModel) {
                     )
 
                     // Pre-assigned Role display
-                    val roleLabel = if (finalRole == "CAPTAIN") "ĐỘI TRƯỞNG" else "CÁN BỘ NGHIỆP VỤ"
-                    val roleIcon = if (finalRole == "CAPTAIN") Icons.Default.Security else Icons.Default.SupervisorAccount
+                    val roleLabel = when (finalRole) {
+                        "CAPTAIN" -> "ĐỘI TRƯỞNG"
+                        "OFFICER" -> "CÁN BỘ NGHIỆP VỤ"
+                        "DISCIPLINE" -> "CÁN BỘ ĐIỀU LỆNH"
+                        else -> finalRole
+                    }
+                    val roleIcon = when (finalRole) {
+                        "CAPTAIN" -> Icons.Default.Security
+                        "OFFICER" -> Icons.Default.SupervisorAccount
+                        "DISCIPLINE" -> Icons.Default.AdminPanelSettings
+                        else -> Icons.Default.Person
+                    }
+                    val roleDesc = when (finalRole) {
+                        "CAPTAIN" -> "Được quyền nộp và quản lý các yêu cầu đề xuất trực tuyến."
+                        "OFFICER" -> "Được quyền phê duyệt và xem xét hồ sơ đề xuất, xử lý chế tài vi phạm."
+                        "DISCIPLINE" -> "Chuyên trách kiểm tra, lập biên bản và quản lý lỗi vi phạm trực tuyến."
+                        else -> ""
+                    }
                     
                     Text(
                         text = "Vai trò đã được Admin phân quyền:",
@@ -708,7 +676,7 @@ fun FirstTimeSetupScreen(cccd: String, viewModel: SecurityViewModel) {
                                     color = MaterialTheme.colorScheme.primary
                                 )
                                 Text(
-                                    text = if (finalRole == "CAPTAIN") "Được quyền nộp và quản lý các yêu cầu đề xuất trực tuyến." else "Được quyền phê duyệt và xem xét hồ sơ đề xuất.",
+                                    text = roleDesc,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -778,6 +746,7 @@ fun CaptainDashboardScreen(user: User, viewModel: SecurityViewModel) {
     var showLeaveDialog by remember { mutableStateOf(false) }
     var showSalaryDialog by remember { mutableStateOf(false) }
     var selectedProposalDetail by remember { mutableStateOf<Proposal?>(null) }
+    var selectedTab by remember { mutableStateOf(0) } // 0: Đề xuất, 1: Vi phạm
 
     val proposals by viewModel.filteredProposals.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
@@ -826,32 +795,65 @@ fun CaptainDashboardScreen(user: User, viewModel: SecurityViewModel) {
             }
         }
 
-        Divider(modifier = Modifier.padding(horizontal = 16.dp))
+        // Tab Row switcher for Captain
+        TabRow(
+            selectedTabIndex = selectedTab,
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+        ) {
+            Tab(
+                selected = selectedTab == 0,
+                onClick = { selectedTab = 0 },
+                text = { Text("Đề xuất của Đội", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)) },
+                icon = { Icon(imageVector = Icons.Default.Description, contentDescription = "Proposals") }
+            )
+            Tab(
+                selected = selectedTab == 1,
+                onClick = { selectedTab = 1 },
+                text = { Text("Tiến trình Vi phạm", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)) },
+                icon = { Icon(imageVector = Icons.Default.Gavel, contentDescription = "Violations") }
+            )
+        }
 
-        // History list & Filter header
-        ProposalListSection(
-            title = "Lịch sử Đề xuất của Đội",
-            proposals = proposals,
-            searchQuery = searchQuery,
-            onSearchChange = { viewModel.searchQuery.value = it },
-            filterType = filterType,
-            onTypeChange = { viewModel.filterType.value = it },
-            filterStatus = filterStatus,
-            onStatusChange = { viewModel.filterStatus.value = it },
-            onProposalClick = { selectedProposalDetail = it }
-        )
+        if (selectedTab == 0) {
+            Divider(modifier = Modifier.padding(horizontal = 16.dp))
+
+            // History list & Filter header
+            ProposalListSection(
+                title = "Lịch sử Đề xuất của Đội",
+                proposals = proposals,
+                searchQuery = searchQuery,
+                onSearchChange = { viewModel.searchQuery.value = it },
+                filterType = filterType,
+                onTypeChange = { viewModel.filterType.value = it },
+                filterStatus = filterStatus,
+                onStatusChange = { viewModel.filterStatus.value = it },
+                onProposalClick = { selectedProposalDetail = it }
+            )
+        } else {
+            val violations by viewModel.allViolations.collectAsStateWithLifecycle()
+            Divider(modifier = Modifier.padding(horizontal = 16.dp))
+
+            ViolationListSection(
+                title = "Lỗi Vi phạm & Tiến trình xử lý",
+                violations = violations,
+                isOfficer = false,
+                onProcessClick = {}
+            )
+        }
     }
 
     // Submit dialogues
     if (showLeaveDialog) {
         SubmitLeaveDialog(
             onDismiss = { showLeaveDialog = false },
-            onSubmit = { name, type, date, reason, sigPoints, attachedImage ->
+            onSubmit = { name, type, startDate, endDate, reason, sigPoints, attachedImage ->
                 // Save signature description or pass mock letter details
                 val sigDesc = if (sigPoints.isNotEmpty()) "HAS_SIGNATURE" else "NO_SIGNATURE"
                 // If we have an attached image, we can store it. Otherwise store sigDesc
                 val finalImagePath = attachedImage ?: sigDesc
-                viewModel.submitLeaveProposal(name, type, date, reason, finalImagePath)
+                viewModel.submitLeaveProposal(name, type, startDate, endDate, reason, finalImagePath)
                 showLeaveDialog = false
             }
         )
@@ -862,7 +864,13 @@ fun CaptainDashboardScreen(user: User, viewModel: SecurityViewModel) {
             onDismiss = { showSalaryDialog = false },
             onSubmitMultiple = { entries, reason ->
                 entries.forEach { entry ->
-                    viewModel.submitSalaryProposal(entry.employeeName, entry.currentSalary, entry.proposedSalary, reason)
+                    viewModel.submitSalaryProposal(
+                        entry.employeeName,
+                        entry.currentSalary,
+                        entry.proposedSalary,
+                        entry.salaryEffectiveDate,
+                        reason
+                    )
                 }
                 showSalaryDialog = false
             }
@@ -874,7 +882,7 @@ fun CaptainDashboardScreen(user: User, viewModel: SecurityViewModel) {
             proposal = selectedProposalDetail!!,
             onDismiss = { selectedProposalDetail = null },
             isOfficer = false,
-            onApprove = { },
+            onApprove = { _, _, _ -> },
             onReject = { _ -> }
         )
     }
@@ -1008,11 +1016,13 @@ fun OfficerDashboardScreen(user: User, viewModel: SecurityViewModel) {
     val filterStatus by viewModel.filterStatus.collectAsStateWithLifecycle()
 
     var selectedProposalDetail by remember { mutableStateOf<Proposal?>(null) }
+    var selectedTab by remember { mutableStateOf(0) } // 0: Đề xuất, 1: Vi phạm
+    var selectedViolationPenalty by remember { mutableStateOf<Violation?>(null) }
 
-    // Aggregate statistics
+    // Aggregate statistics for Proposals
     val pendingCount = proposals.count { it.status == "RECEIVED" }
-    val approvedCount = proposals.count { it.status == "APPROVED" }
-    val rejectedCount = proposals.count { it.status == "REJECTED" }
+    val approvedCount = proposals.count { it.status == "APPROVED" || it.status == "OFFICER_APPROVED" }
+    val rejectedCount = proposals.count { it.status == "REJECTED" || it.status == "ADMIN_REJECTED" }
 
     Column(
         modifier = Modifier.fillMaxSize()
@@ -1020,50 +1030,116 @@ fun OfficerDashboardScreen(user: User, viewModel: SecurityViewModel) {
         // Upper Profile Bar
         OfficerHeader(user = user, onLogout = { viewModel.logout() })
 
-        // Quick Stats Cards Rows
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        // Tab Row switcher
+        TabRow(
+            selectedTabIndex = selectedTab,
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
         ) {
-            StatsCard(
-                title = "Đang chờ duyệt",
-                count = pendingCount,
-                color = WarningColor,
-                icon = Icons.Default.HourglassEmpty,
-                modifier = Modifier.weight(1f)
+            Tab(
+                selected = selectedTab == 0,
+                onClick = { selectedTab = 0 },
+                text = { Text("Đề xuất Vận hành", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)) },
+                icon = { Icon(imageVector = Icons.Default.Description, contentDescription = "Proposals") }
             )
-            StatsCard(
-                title = "Đã phê duyệt",
-                count = approvedCount,
-                color = SuccessColor,
-                icon = Icons.Default.CheckCircle,
-                modifier = Modifier.weight(1f)
-            )
-            StatsCard(
-                title = "Từ chối",
-                count = rejectedCount,
-                color = ErrorColor,
-                icon = Icons.Default.Cancel,
-                modifier = Modifier.weight(1f)
+            Tab(
+                selected = selectedTab == 1,
+                onClick = { selectedTab = 1 },
+                text = { Text("Xử lý Vi phạm", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)) },
+                icon = { Icon(imageVector = Icons.Default.Gavel, contentDescription = "Violations") }
             )
         }
 
-        Divider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+        if (selectedTab == 0) {
+            // Quick Stats Cards Rows
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                StatsCard(
+                    title = "Đang chờ duyệt",
+                    count = pendingCount,
+                    color = WarningColor,
+                    icon = Icons.Default.HourglassEmpty,
+                    modifier = Modifier.weight(1f)
+                )
+                StatsCard(
+                    title = "Đã phê duyệt",
+                    count = approvedCount,
+                    color = SuccessColor,
+                    icon = Icons.Default.CheckCircle,
+                    modifier = Modifier.weight(1f)
+                )
+                StatsCard(
+                    title = "Từ chối",
+                    count = rejectedCount,
+                    color = ErrorColor,
+                    icon = Icons.Default.Cancel,
+                    modifier = Modifier.weight(1f)
+                )
+            }
 
-        // Proposals filterable list
-        ProposalListSection(
-            title = "Danh sách Đề xuất Vận hành",
-            proposals = proposals,
-            searchQuery = searchQuery,
-            onSearchChange = { viewModel.searchQuery.value = it },
-            filterType = filterType,
-            onTypeChange = { viewModel.filterType.value = it },
-            filterStatus = filterStatus,
-            onStatusChange = { viewModel.filterStatus.value = it },
-            onProposalClick = { selectedProposalDetail = it }
-        )
+            Divider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+
+            // Proposals filterable list
+            ProposalListSection(
+                title = "Danh sách Đề xuất Vận hành",
+                proposals = proposals,
+                searchQuery = searchQuery,
+                onSearchChange = { viewModel.searchQuery.value = it },
+                filterType = filterType,
+                onTypeChange = { viewModel.filterType.value = it },
+                filterStatus = filterStatus,
+                onStatusChange = { viewModel.filterStatus.value = it },
+                onProposalClick = { selectedProposalDetail = it }
+            )
+        } else {
+            val violations by viewModel.allViolations.collectAsStateWithLifecycle()
+            val totalVi = violations.size
+            val pendingVi = violations.count { it.status == "RECEIVED" }
+            val resolvedVi = violations.count { it.status == "PROCESSED" }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                StatsCard(
+                    title = "Tổng vi phạm",
+                    count = totalVi,
+                    color = MaterialTheme.colorScheme.primary,
+                    icon = Icons.Default.Assessment,
+                    modifier = Modifier.weight(1f)
+                )
+                StatsCard(
+                    title = "Chờ chế tài",
+                    count = pendingVi,
+                    color = WarningColor,
+                    icon = Icons.Default.HourglassEmpty,
+                    modifier = Modifier.weight(1f)
+                )
+                StatsCard(
+                    title = "Đã xử phạt",
+                    count = resolvedVi,
+                    color = SuccessColor,
+                    icon = Icons.Default.CheckCircle,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Divider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+
+            ViolationListSection(
+                title = "Danh sách Biên bản Vi phạm",
+                violations = violations,
+                isOfficer = true,
+                onProcessClick = { selectedViolationPenalty = it }
+            )
+        }
     }
 
     if (selectedProposalDetail != null) {
@@ -1071,8 +1147,15 @@ fun OfficerDashboardScreen(user: User, viewModel: SecurityViewModel) {
             proposal = selectedProposalDetail!!,
             onDismiss = { selectedProposalDetail = null },
             isOfficer = true,
-            onApprove = {
-                viewModel.processProposal(selectedProposalDetail!!.id, isApproved = true, rejectReason = null)
+            onApprove = { adjustedDate, adjustedSalary, adjustedSalaryDate ->
+                viewModel.processProposal(
+                    selectedProposalDetail!!.id,
+                    isApproved = true,
+                    rejectReason = null,
+                    adjustedLeaveDate = adjustedDate,
+                    adjustedProposedSalary = adjustedSalary,
+                    adjustedSalaryEffectiveDate = adjustedSalaryDate
+                )
                 selectedProposalDetail = null
             },
             onReject = { reason ->
@@ -1080,6 +1163,800 @@ fun OfficerDashboardScreen(user: User, viewModel: SecurityViewModel) {
                 selectedProposalDetail = null
             }
         )
+    }
+
+    if (selectedViolationPenalty != null) {
+        SelectPenaltyDialog(
+            violation = selectedViolationPenalty!!,
+            onDismiss = { selectedViolationPenalty = null },
+            onSubmit = { penalty, note ->
+                viewModel.selectPenaltyForViolation(selectedViolationPenalty!!.id, penalty, note)
+                selectedViolationPenalty = null
+            }
+        )
+    }
+}
+
+@Composable
+fun DisciplineDashboardScreen(user: User, viewModel: SecurityViewModel) {
+    val violations by viewModel.allViolations.collectAsStateWithLifecycle()
+    var showCreateDialog by remember { mutableStateOf(false) }
+
+    // Filter to violations created by this discipline officer
+    val myViolations = violations.filter { it.reporterCccd == user.cccd }
+    val pendingCount = myViolations.count { it.status == "RECEIVED" }
+    val processedCount = myViolations.count { it.status == "PROCESSED" }
+
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        // Upper Header
+        DisciplineHeader(user = user, onLogout = { viewModel.logout() })
+
+        // Quick Stats Row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            StatsCard(
+                title = "Đã tiếp nhận",
+                count = pendingCount,
+                color = WarningColor,
+                icon = Icons.Default.HourglassEmpty,
+                modifier = Modifier.weight(1f)
+            )
+            StatsCard(
+                title = "Đã xử lý phạt",
+                count = processedCount,
+                color = SuccessColor,
+                icon = Icons.Default.CheckCircle,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        // Action Button: Lập biên bản vi phạm
+        Button(
+            onClick = { showCreateDialog = true },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .height(54.dp)
+                .testTag("create_violation_btn"),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+        ) {
+            Icon(imageVector = Icons.Default.AddAlert, contentDescription = "Report Alert")
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("LẬP BIÊN BẢN VI PHẠM MỚI", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold))
+        }
+
+        Divider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+
+        // Violation list
+        ViolationListSection(
+            title = "Biên bản Vi phạm đã lập",
+            violations = myViolations,
+            isOfficer = false,
+            onProcessClick = {}
+        )
+    }
+
+    if (showCreateDialog) {
+        CreateViolationDialog(
+            onDismiss = { showCreateDialog = false },
+            onSubmit = { targetType, targetName, violationType, imageUri ->
+                viewModel.submitViolationReport(targetType, targetName, violationType, imageUri)
+                showCreateDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun DisciplineHeader(user: User, onLogout: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        shape = RoundedCornerShape(24.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    shape = CircleShape,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.AdminPanelSettings,
+                            contentDescription = "Discipline Officer",
+                            tint = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+                Column {
+                    Text(
+                        text = user.fullName,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "CÁN BỘ ĐIỀU LỆNH",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+
+            IconButton(
+                onClick = onLogout,
+                modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Logout,
+                    contentDescription = "Logout",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CreateViolationDialog(
+    onDismiss: () -> Unit,
+    onSubmit: (targetType: String, targetName: String, violationType: String, imageUri: String?) -> Unit
+) {
+    var targetType by remember { mutableStateOf("TARGET") } // "TARGET" or "EMPLOYEE"
+    var targetName by remember { mutableStateOf("") }
+    var selectedViolation by remember { mutableStateOf("") }
+    var attachedImageUri by remember { mutableStateOf<String?>(null) }
+
+    val targetErrors = listOf(
+        "Chụp sai quy định",
+        "Không chụp báo",
+        "Sai giày",
+        "Sai nón",
+        "Sai cà vạt",
+        "Sai đồng phục"
+    )
+
+    val employeeErrors = listOf(
+        "Ngủ",
+        "Sử dụng ĐT",
+        "Bỏ vị trí",
+        "Sai đồng phục",
+        "Mất đoàn kết"
+    )
+
+    val errors = if (targetType == "TARGET") targetErrors else employeeErrors
+
+    // When targetType changes, clear selected violation
+    LaunchedEffect(targetType) {
+        selectedViolation = ""
+    }
+
+    val context = LocalContext.current
+
+    // File selection launcher
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            attachedImageUri = uri.toString()
+        }
+    }
+
+    // Camera capture launcher
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap: Bitmap? ->
+        if (bitmap != null) {
+            try {
+                val cacheFile = File(context.cacheDir, "violation_${System.currentTimeMillis()}.jpg")
+                val outputStream = FileOutputStream(cacheFile)
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream)
+                outputStream.flush()
+                outputStream.close()
+                attachedImageUri = Uri.fromFile(cacheFile).toString()
+            } catch (e: Exception) {
+                e.printStackTrace()
+                android.widget.Toast.makeText(context, "Lỗi lưu ảnh: ${e.localizedMessage}", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    // Permission launcher for Camera
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            cameraLauncher.launch(null)
+        } else {
+            android.widget.Toast.makeText(context, "Cần cấp quyền Camera để chụp ảnh", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "LẬP BIÊN BẢN VI PHẠM",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
+
+                Divider()
+
+                // Target Type selection
+                Text(
+                    text = "Đối tượng vi phạm:",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    ElevatedFilterChip(
+                        selected = targetType == "TARGET",
+                        onClick = { targetType = "TARGET" },
+                        label = { Text("Mục tiêu vi phạm") },
+                        modifier = Modifier.weight(1f)
+                    )
+                    ElevatedFilterChip(
+                        selected = targetType == "EMPLOYEE",
+                        onClick = { targetType = "EMPLOYEE" },
+                        label = { Text("Nhân viên vi phạm") },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                // Name input
+                OutlinedTextField(
+                    value = targetName,
+                    onValueChange = { targetName = it },
+                    label = { Text(if (targetType == "TARGET") "Tên Mục Tiêu Vi Phạm" else "Họ & Tên Nhân Viên Vi Phạm") },
+                    placeholder = { Text(if (targetType == "TARGET") "Ví dụ: Mục tiêu Landmark 81..." else "Ví dụ: Nguyễn Văn Hải...") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // Error Selection Grid
+                Text(
+                    text = "Lỗi vi phạm điều lệnh:",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                )
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    errors.chunked(2).forEach { pair ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            pair.forEach { err ->
+                                val isSelected = selectedViolation == err
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = { selectedViolation = err },
+                                    label = { Text(err, style = MaterialTheme.typography.bodySmall) },
+                                    modifier = Modifier.weight(1f),
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = MaterialTheme.colorScheme.errorContainer,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                )
+                            }
+                            if (pair.size < 2) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+
+                // Attached image section
+                Text(
+                    text = "Hình ảnh minh chứng vi phạm (Bắt buộc):",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                )
+                if (attachedImageUri == null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA) },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.PhotoCamera, contentDescription = "Camera")
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Chụp ảnh")
+                        }
+                        OutlinedButton(
+                            onClick = { filePickerLauncher.launch("image/*") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.Photo, contentDescription = "Gallery")
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Chọn ảnh")
+                        }
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(180.dp)
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        SubcomposeAsyncImage(
+                            model = attachedImageUri,
+                            contentDescription = "Attached proof",
+                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                        IconButton(
+                            onClick = { attachedImageUri = null },
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(8.dp)
+                                .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                        ) {
+                            Icon(imageVector = Icons.Default.Close, contentDescription = "Remove image", tint = Color.White)
+                        }
+                    }
+                }
+
+                // Submit and cancel buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("HỦY")
+                    }
+
+                    val isEnabled = targetName.isNotBlank() && selectedViolation.isNotBlank() && attachedImageUri != null
+                    Button(
+                        onClick = {
+                            if (isEnabled) {
+                                onSubmit(targetType, targetName, selectedViolation, attachedImageUri)
+                            }
+                        },
+                        enabled = isEnabled,
+                        modifier = Modifier.weight(1.5f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("GỬI BIÊN BẢN", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SelectPenaltyDialog(
+    violation: Violation,
+    onDismiss: () -> Unit,
+    onSubmit: (penalty: String, note: String) -> Unit
+) {
+    var selectedPenalty by remember { mutableStateOf("Trừ tiền mặt") }
+    var note by remember { mutableStateOf("") }
+
+    val options = listOf(
+        "Trừ tiền mặt",
+        "Nhắc nhở",
+        "Cộng gộp lần 2",
+        "Trừ thưởng",
+        "Đề nghị sa thải"
+    )
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text(
+                    text = "ÁP DỤNG CHẾ TÀI XỬ LÝ",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
+
+                Divider()
+
+                Text(
+                    text = "Biên bản của: ${violation.targetName}",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                )
+                Text(
+                    text = "Lỗi vi phạm: ${violation.violationType}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error
+                )
+
+                Divider()
+
+                Text(
+                    text = "Chọn chế tài xử lý:",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                )
+
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    options.forEach { opt ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { selectedPenalty = opt }
+                                .padding(vertical = 4.dp)
+                        ) {
+                            RadioButton(
+                                selected = selectedPenalty == opt,
+                                onClick = { selectedPenalty = opt }
+                            )
+                            Text(text = opt, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = { note = it },
+                    label = { Text("Lý do / Quyết định xử lý chi tiết") },
+                    placeholder = { Text("Nhập lý do chi tiết hoặc căn cứ xử phạt...") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("HỦY")
+                    }
+
+                    Button(
+                        onClick = {
+                            if (selectedPenalty.isNotBlank() && note.isNotBlank()) {
+                                onSubmit(selectedPenalty, note)
+                            }
+                        },
+                        enabled = selectedPenalty.isNotBlank() && note.isNotBlank(),
+                        modifier = Modifier.weight(1.5f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("XÁC NHẬN")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ViolationListSection(
+    title: String,
+    violations: List<Violation>,
+    isOfficer: Boolean,
+    onProcessClick: (Violation) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onBackground
+        )
+
+        if (violations.isEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Default.AssignmentTurnedIn,
+                            contentDescription = "No Violations",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Chưa ghi nhận biên bản vi phạm nào",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                items(violations) { violation ->
+                    ViolationItemCard(
+                        violation = violation,
+                        isOfficer = isOfficer,
+                        onProcessClick = { onProcessClick(violation) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ViolationItemCard(
+    violation: Violation,
+    isOfficer: Boolean,
+    onProcessClick: () -> Unit
+) {
+    val isProcessed = violation.status == "PROCESSED"
+    val badgeColor = if (isProcessed) SuccessColor else WarningColor
+    val badgeText = if (isProcessed) "ĐÃ XỬ LÝ" else "CHỜ XỬ LÝ"
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp)),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    color = if (violation.targetType == "TARGET") MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.tertiaryContainer,
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = if (violation.targetType == "TARGET") "Mục tiêu vi phạm" else "Nhân viên vi phạm",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = if (violation.targetType == "TARGET") MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onTertiaryContainer,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+
+                Surface(
+                    color = badgeColor.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = badgeText,
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = badgeColor,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = violation.targetName,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ReportProblem,
+                        contentDescription = "Violation detail",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = "Lỗi vi phạm: ${violation.violationType}",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PersonOutline,
+                        contentDescription = "Reporter icon",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        text = "Bởi: ${violation.reporterName}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                val df = SimpleDateFormat("HH:mm - dd/MM/yyyy", Locale.getDefault())
+                Text(
+                    text = df.format(Date(violation.timestamp)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (!violation.imagePath.isNullOrBlank()) {
+                var isExpandedImg by remember { mutableStateOf(false) }
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp)
+                        .clickable { isExpandedImg = true },
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    SubcomposeAsyncImage(
+                        model = violation.imagePath,
+                        contentDescription = "Violation photo",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+
+                if (isExpandedImg) {
+                    Dialog(onDismissRequest = { isExpandedImg = false }) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(8.dp)) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(300.dp)
+                                ) {
+                                    SubcomposeAsyncImage(
+                                        model = violation.imagePath,
+                                        contentDescription = "Violation photo full",
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Fit
+                                    )
+                                    IconButton(
+                                        onClick = { isExpandedImg = false },
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                                    ) {
+                                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (isProcessed) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Gavel,
+                                contentDescription = "Sanction icon",
+                                tint = SuccessColor,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "CHẾ TÀI ÁP DỤNG: ${violation.penalty}",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                color = SuccessColor
+                            )
+                        }
+                        Text(
+                            text = "Chi tiết: ${violation.penaltyNote}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Xử lý bởi: ${violation.officerName}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            if (isOfficer && !isProcessed) {
+                Button(
+                    onClick = onProcessClick,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.Gavel, contentDescription = "Process penalty", modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("ÁP DỤNG CHẾ TÀI XỬ LÝ", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold))
+                }
+            }
+        }
     }
 }
 
@@ -1392,7 +2269,13 @@ fun AdminDashboardScreen(user: User, viewModel: SecurityViewModel) {
                         p.proposerName.contains(searchQueryAdmin, ignoreCase = true) ||
                         p.reason.contains(searchQueryAdmin, ignoreCase = true)
                 val matchesType = filterTypeAdmin == "ALL" || p.type == filterTypeAdmin
-                val matchesStatus = filterStatusAdmin == "ALL" || p.status == filterStatusAdmin
+                val matchesStatus = when (filterStatusAdmin) {
+                    "ALL" -> true
+                    "RECEIVED" -> p.status == "RECEIVED" || p.status == "OFFICER_APPROVED"
+                    "APPROVED" -> p.status == "APPROVED"
+                    "REJECTED" -> p.status == "REJECTED" || p.status == "ADMIN_REJECTED"
+                    else -> p.status == filterStatusAdmin
+                }
                 matchesQuery && matchesType && matchesStatus
             }
 
@@ -1411,12 +2294,26 @@ fun AdminDashboardScreen(user: User, viewModel: SecurityViewModel) {
             }
 
             if (selectedProposalDetailAdmin != null) {
+                val canAdminApprove = selectedProposalDetailAdmin!!.type == "SALARY" && selectedProposalDetailAdmin!!.status == "OFFICER_APPROVED"
                 ProposalDetailDialog(
                     proposal = selectedProposalDetailAdmin!!,
                     onDismiss = { selectedProposalDetailAdmin = null },
-                    isOfficer = false,
-                    onApprove = {},
-                    onReject = {}
+                    isOfficer = canAdminApprove,
+                    onApprove = { adjustedDate, adjustedSalary, adjustedSalaryDate ->
+                        viewModel.processProposal(
+                            selectedProposalDetailAdmin!!.id,
+                            isApproved = true,
+                            rejectReason = null,
+                            adjustedLeaveDate = adjustedDate,
+                            adjustedProposedSalary = adjustedSalary,
+                            adjustedSalaryEffectiveDate = adjustedSalaryDate
+                        )
+                        selectedProposalDetailAdmin = null
+                    },
+                    onReject = { reason ->
+                        viewModel.processProposal(selectedProposalDetailAdmin!!.id, isApproved = false, rejectReason = reason)
+                        selectedProposalDetailAdmin = null
+                    }
                 )
             }
         }
@@ -1457,7 +2354,7 @@ fun UserRoleItemCard(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.weight(1f)
                 ) {
-                    if (user.role == "CAPTAIN" || user.role == "OFFICER") {
+                    if (user.role != "ADMIN") {
                         SubcomposeAsyncImage(
                             model = "https://i.ibb.co/fzhxZv5H/z7997808820598-c1f98aab385f7f198efebdd2a8b84471.jpg",
                             contentDescription = "User Avatar",
@@ -1483,8 +2380,14 @@ fun UserRoleItemCard(
                                     modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant),
                                     contentAlignment = Alignment.Center
                                 ) {
+                                    val icon = when (user.role) {
+                                        "CAPTAIN" -> Icons.Default.Security
+                                        "OFFICER" -> Icons.Default.SupervisorAccount
+                                        "DISCIPLINE" -> Icons.Default.AdminPanelSettings
+                                        else -> Icons.Default.Person
+                                    }
                                     Icon(
-                                        imageVector = if (user.role == "CAPTAIN") Icons.Default.Security else Icons.Default.SupervisorAccount,
+                                        imageVector = icon,
                                         contentDescription = "User Icon",
                                         tint = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.size(24.dp)
@@ -1546,10 +2449,15 @@ fun UserRoleItemCard(
                             color = pwdColor
                         )
                         Spacer(modifier = Modifier.height(2.dp))
-                        val displayLocation = if (user.assignedLocation.isBlank()) {
-                            "Mục tiêu quản lý: Chưa thiết lập"
-                        } else {
-                            "Mục tiêu quản lý: ${user.assignedLocation}"
+                        val displayLocation = when (user.role) {
+                            "ADMIN" -> "Bộ phận: Quản trị hệ thống (Trụ sở chính)"
+                            "OFFICER" -> "Bộ phận: Phòng Nghiệp vụ"
+                            "DISCIPLINE" -> "Bộ phận: Phòng Điều lệnh"
+                            else -> if (user.assignedLocation.isBlank()) {
+                                "Mục tiêu quản lý: Chưa thiết lập"
+                            } else {
+                                "Mục tiêu quản lý: ${user.assignedLocation}"
+                            }
                         }
                         Text(
                             text = displayLocation,
@@ -1591,13 +2499,13 @@ fun UserRoleItemCard(
             } else {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     // Captain Role Toggle
                     ElevatedFilterChip(
                         selected = user.role == "CAPTAIN",
                         onClick = { onRoleChange("CAPTAIN") },
-                        label = { Text("Đội Trưởng (Captain)") },
+                        label = { Text("Đội Trưởng", style = MaterialTheme.typography.bodySmall) },
                         modifier = Modifier.weight(1f)
                     )
 
@@ -1605,8 +2513,16 @@ fun UserRoleItemCard(
                     ElevatedFilterChip(
                         selected = user.role == "OFFICER",
                         onClick = { onRoleChange("OFFICER") },
-                        label = { Text("CB Nghiệp Vụ") },
-                        modifier = Modifier.weight(1f)
+                        label = { Text("CB Nghiệp Vụ", style = MaterialTheme.typography.bodySmall) },
+                        modifier = Modifier.weight(1.3f)
+                    )
+
+                    // Discipline Officer Role Toggle
+                    ElevatedFilterChip(
+                        selected = user.role == "DISCIPLINE",
+                        onClick = { onRoleChange("DISCIPLINE") },
+                        label = { Text("CB Điều Lệnh", style = MaterialTheme.typography.bodySmall) },
+                        modifier = Modifier.weight(1.3f)
                     )
                 }
             }
@@ -1921,9 +2837,11 @@ fun ProposalItemCard(proposal: Proposal, onClick: () -> Unit) {
 @Composable
 fun StatusBadge(status: String) {
     val (label, bg, tint) = when (status) {
-        "RECEIVED" -> Triple("Đã Tiếp nhận", WarningColor.copy(alpha = 0.15f), WarningColor)
-        "APPROVED" -> Triple("Phê duyệt", SuccessColor.copy(alpha = 0.15f), SuccessColor)
-        "REJECTED" -> Triple("Từ chối", ErrorColor.copy(alpha = 0.15f), ErrorColor)
+        "RECEIVED" -> Triple("Chờ Nghiệp vụ", WarningColor.copy(alpha = 0.15f), WarningColor)
+        "OFFICER_APPROVED" -> Triple("Chờ Giám đốc", InfoColor.copy(alpha = 0.15f), InfoColor)
+        "APPROVED" -> Triple("Đã Phê duyệt", SuccessColor.copy(alpha = 0.15f), SuccessColor)
+        "REJECTED" -> Triple("Nghiệp vụ từ chối", ErrorColor.copy(alpha = 0.15f), ErrorColor)
+        "ADMIN_REJECTED" -> Triple("Giám đốc từ chối", ErrorColor.copy(alpha = 0.15f), ErrorColor)
         else -> Triple("Không rõ", Color.LightGray, Color.Gray)
     }
 
@@ -1954,6 +2872,20 @@ fun calculateDaysRemaining(leaveDateStr: String?): Long {
     }
 }
 
+fun calculateLeaveDurationDays(startDateStr: String?, endDateStr: String?): Long {
+    if (startDateStr.isNullOrEmpty() || endDateStr.isNullOrEmpty()) return 0
+    return try {
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val start = sdf.parse(startDateStr) ?: return 0
+        val end = sdf.parse(endDateStr) ?: return 0
+        val diff = end.time - start.time
+        val days = diff / (1000 * 60 * 60 * 24) + 1 // Inclusive
+        if (days < 1) 1 else days
+    } catch (e: Exception) {
+        1
+    }
+}
+
 // -----------------------------------------------------------------------------
 // DYNAMIC MOCK RESIGNATION DOCUMENT COMPOSE DRAWINGS WITH STAMP & SIGNATURE
 // -----------------------------------------------------------------------------
@@ -1962,6 +2894,7 @@ fun ResignationLetterDoc(
     employeeName: String,
     leaveType: String,
     leaveDateStr: String,
+    leaveEndDateStr: String? = null,
     reason: String,
     captainName: String,
     status: String,
@@ -1975,6 +2908,15 @@ fun ResignationLetterDoc(
         date?.let { df.format(it) } ?: leaveDateStr
     } catch (e: Exception) {
         leaveDateStr
+    }
+
+    val formattedLeaveEndDate = try {
+        if (!leaveEndDateStr.isNullOrEmpty()) {
+            val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(leaveEndDateStr)
+            date?.let { df.format(it) } ?: leaveEndDateStr
+        } else null
+    } catch (e: Exception) {
+        leaveEndDateStr
     }
 
     Card(
@@ -2063,11 +3005,25 @@ fun ResignationLetterDoc(
                     )
 
                     val actionText = if (leaveType == "RESIGNATION") "xin thôi việc kể từ ngày" else "xin nghỉ phép từ ngày"
+                    val dateSpanText = if (leaveType == "LEAVE" && !formattedLeaveEndDate.isNullOrEmpty()) {
+                        "Tôi làm đơn này kính trình Ban lãnh đạo xin nghỉ phép từ ngày: $formattedLeaveDate đến ngày: $formattedLeaveEndDate"
+                    } else {
+                        "Tôi làm đơn này kính trình Ban lãnh đạo $actionText: $formattedLeaveDate"
+                    }
                     Text(
-                        text = "Tôi làm đơn này kính trình Ban lãnh đạo $actionText: $formattedLeaveDate",
+                        text = dateSpanText,
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.DarkGray
                     )
+
+                    if (leaveType == "LEAVE" && !leaveEndDateStr.isNullOrEmpty()) {
+                        val duration = calculateLeaveDurationDays(leaveDateStr, leaveEndDateStr)
+                        Text(
+                            text = "Tổng số ngày nghỉ phép đề xuất: $duration ngày.",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            color = Color.DarkGray
+                        )
+                    }
 
                     Text(
                         text = "Lý do xin nghỉ: $reason",
@@ -2115,7 +3071,7 @@ fun ResignationLetterDoc(
             }
 
             // RED OFFICIAL COMPANY STAMP overlay if Approved/Rejected!
-            if (status == "APPROVED" || status == "REJECTED") {
+            if (status == "APPROVED" || status == "REJECTED" || status == "ADMIN_REJECTED") {
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
@@ -2223,11 +3179,12 @@ fun OfficialRedStamp(statusText: String, officerName: String, modifier: Modifier
 @Composable
 fun SubmitLeaveDialog(
     onDismiss: () -> Unit,
-    onSubmit: (name: String, type: String, date: String, reason: String, sigPoints: List<Offset>, attachedImage: String?) -> Unit
+    onSubmit: (name: String, type: String, startDate: String, endDate: String?, reason: String, sigPoints: List<Offset>, attachedImage: String?) -> Unit
 ) {
     var empName by remember { mutableStateOf("") }
     var leaveType by remember { mutableStateOf("LEAVE") } // "LEAVE" or "RESIGNATION"
     var leaveDate by remember { mutableStateOf("") } // YYYY-MM-DD
+    var leaveEndDate by remember { mutableStateOf("") } // YYYY-MM-DD
     var reason by remember { mutableStateOf("") }
 
     // Attached Image State
@@ -2287,13 +3244,14 @@ fun SubmitLeaveDialog(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp)
-                .verticalScroll(rememberScrollState()),
+                .padding(12.dp),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(
-                modifier = Modifier.padding(20.dp),
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
@@ -2382,6 +3340,20 @@ fun SubmitLeaveDialog(
                     )
                 }
 
+                val endDatePickerDialog = remember(localizedContext) {
+                    android.app.DatePickerDialog(
+                        localizedContext,
+                        { _, year, monthOfYear, dayOfMonth ->
+                            val formattedMonth = String.format("%02d", monthOfYear + 1)
+                            val formattedDay = String.format("%02d", dayOfMonth)
+                            leaveEndDate = "$year-$formattedMonth-$formattedDay"
+                        },
+                        initialYear,
+                        initialMonth,
+                        initialDay
+                    )
+                }
+
                 // Update datePickerDialog's date when initial changes or field changes
                 LaunchedEffect(leaveDate) {
                     if (leaveDate.trim().length == 10 && leaveDate.contains("-")) {
@@ -2395,25 +3367,41 @@ fun SubmitLeaveDialog(
                     }
                 }
 
+                // Update endDatePickerDialog's date when initial changes or field changes
+                LaunchedEffect(leaveEndDate) {
+                    if (leaveEndDate.trim().length == 10 && leaveEndDate.contains("-")) {
+                        val parts = leaveEndDate.split("-")
+                        val y = parts.getOrNull(0)?.toIntOrNull()
+                        val m = parts.getOrNull(1)?.toIntOrNull()
+                        val d = parts.getOrNull(2)?.toIntOrNull()
+                        if (y != null && m != null && d != null) {
+                            endDatePickerDialog.updateDate(y, m - 1, d)
+                        }
+                    }
+                }
+
+                val startLabel = if (leaveType == "RESIGNATION") "Ngày thôi việc dự kiến" else "Ngày bắt đầu nghỉ phép"
+                val startPlaceholder = if (leaveType == "RESIGNATION") "Nhấp chọn ngày thôi việc" else "Nhấp chọn ngày bắt đầu nghỉ"
+
                 Box(modifier = Modifier.fillMaxWidth()) {
                     OutlinedTextField(
                         value = leaveDate,
                         onValueChange = { },
-                        label = { Text("Ngày bắt đầu nghỉ / thôi việc") },
-                        placeholder = { Text("Nhấp chọn ngày từ lịch") },
+                        label = { Text(startLabel) },
+                        placeholder = { Text(startPlaceholder) },
                         singleLine = true,
                         readOnly = true,
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Default.CalendarToday,
-                                contentDescription = "Select Date",
+                                contentDescription = "Select Start Date",
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         },
                         trailingIcon = {
                             Icon(
                                 imageVector = Icons.Default.DateRange,
-                                contentDescription = "Open Calendar Picker",
+                                contentDescription = "Open Start Calendar Picker",
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         },
@@ -2428,6 +3416,70 @@ fun SubmitLeaveDialog(
                             .matchParentSize()
                             .clickable { datePickerDialog.show() }
                     )
+                }
+
+                if (leaveType == "LEAVE") {
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = leaveEndDate,
+                            onValueChange = { },
+                            label = { Text("Ngày kết thúc nghỉ phép") },
+                            placeholder = { Text("Nhấp chọn ngày kết thúc nghỉ") },
+                            singleLine = true,
+                            readOnly = true,
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.CalendarToday,
+                                    contentDescription = "Select End Date",
+                                    tint = MaterialTheme.colorScheme.secondary
+                                )
+                            },
+                            trailingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.DateRange,
+                                    contentDescription = "Open End Calendar Picker",
+                                    tint = MaterialTheme.colorScheme.secondary
+                                )
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("leave_end_date_input"),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .clickable { endDatePickerDialog.show() }
+                        )
+                    }
+
+                    // Display expected leave duration days if both start and end dates are specified
+                    if (leaveDate.trim().length == 10 && leaveEndDate.trim().length == 10) {
+                        val duration = calculateLeaveDurationDays(leaveDate.trim(), leaveEndDate.trim())
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.DateRange,
+                                    contentDescription = "Duration",
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Text(
+                                    text = "Số ngày nghỉ phép dự kiến: $duration ngày",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+                        }
+                    }
                 }
 
                 // Live countdown display
@@ -2705,13 +3757,21 @@ fun SubmitLeaveDialog(
 
                     Button(
                         onClick = {
-                            if (empName.isNotBlank() && leaveDate.isNotBlank() && reason.isNotBlank()) {
+                            if (empName.isNotBlank() && leaveDate.isNotBlank() && (leaveType == "RESIGNATION" || leaveEndDate.isNotBlank()) && reason.isNotBlank()) {
                                 val allPointsCollected = completedPaths.flatten()
-                                onSubmit(empName, leaveType, leaveDate, reason, allPointsCollected, if (leaveType == "RESIGNATION") attachedImageUri else null)
+                                onSubmit(
+                                    empName,
+                                    leaveType,
+                                    leaveDate,
+                                    if (leaveType == "LEAVE") leaveEndDate else null,
+                                    reason,
+                                    allPointsCollected,
+                                    if (leaveType == "RESIGNATION") attachedImageUri else null
+                                )
                             }
                         },
                         modifier = Modifier.weight(1.5f),
-                        enabled = empName.isNotBlank() && leaveDate.isNotBlank() && reason.isNotBlank(),
+                        enabled = empName.isNotBlank() && leaveDate.isNotBlank() && (leaveType == "RESIGNATION" || leaveEndDate.isNotBlank()) && reason.isNotBlank(),
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                     ) {
@@ -2729,7 +3789,8 @@ fun SubmitLeaveDialog(
 data class SalaryAdjustmentRequest(
     val employeeName: String,
     val currentSalary: Double,
-    val proposedSalary: Double
+    val proposedSalary: Double,
+    val salaryEffectiveDate: String
 )
 
 data class SalaryEntryState(
@@ -2748,8 +3809,17 @@ fun SubmitSalaryDialog(
     var entries by remember { mutableStateOf(listOf(SalaryEntryState(id = 1))) }
     var nextId by remember { mutableStateOf(2) }
     var reason by remember { mutableStateOf("") }
+    
+    val calendar = Calendar.getInstance()
+    val todayMonthStr = remember {
+        val y = calendar.get(Calendar.YEAR)
+        val m = String.format("%02d", calendar.get(Calendar.MONTH) + 1)
+        "$y-$m"
+    }
+    var effectiveDate by remember { mutableStateOf(todayMonthStr) }
+    var showMonthPicker by remember { mutableStateOf(false) }
 
-    val isFormValid = reason.isNotBlank() && entries.isNotEmpty() && entries.all { entry ->
+    val isFormValid = reason.isNotBlank() && effectiveDate.isNotBlank() && entries.isNotEmpty() && entries.all { entry ->
         entry.name.isNotBlank() &&
         (entry.currentSalary.toDoubleOrNull() ?: 0.0) > 0.0 &&
         (entry.proposedSalary.toDoubleOrNull() ?: 0.0) > 0.0
@@ -2759,13 +3829,14 @@ fun SubmitSalaryDialog(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp)
-                .verticalScroll(rememberScrollState()),
+                .padding(12.dp),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(
-                modifier = Modifier.padding(20.dp),
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
@@ -2906,6 +3977,78 @@ fun SubmitSalaryDialog(
                     Text("THÊM NHÂN VIÊN ĐIỀU CHỈNH")
                 }
 
+                // Proposed Effective Date (tháng đề xuất áp dụng mức lương mới)
+                val initialYear: Int
+                val initialMonth: Int
+                if (effectiveDate.contains("-")) {
+                    val parts = effectiveDate.split("-")
+                    initialYear = parts.getOrNull(0)?.toIntOrNull() ?: calendar.get(Calendar.YEAR)
+                    initialMonth = parts.getOrNull(1)?.toIntOrNull() ?: (calendar.get(Calendar.MONTH) + 1)
+                } else {
+                    initialYear = calendar.get(Calendar.YEAR)
+                    initialMonth = calendar.get(Calendar.MONTH) + 1
+                }
+
+                if (showMonthPicker) {
+                    MonthYearPickerDialog(
+                        initialYear = initialYear,
+                        initialMonth = initialMonth,
+                        onDismiss = { showMonthPicker = false },
+                        onDateSelected = { year, month ->
+                            val formattedMonth = String.format("%02d", month)
+                            effectiveDate = "$year-$formattedMonth"
+                            showMonthPicker = false
+                        }
+                    )
+                }
+
+                val displayEffectiveDate = try {
+                    if (effectiveDate.contains("-")) {
+                        val parts = effectiveDate.split("-")
+                        val y = parts.getOrNull(0) ?: ""
+                        val m = parts.getOrNull(1) ?: ""
+                        if (y.isNotEmpty() && m.isNotEmpty()) "Tháng $m/$y" else effectiveDate
+                    } else {
+                        effectiveDate
+                    }
+                } catch (e: Exception) {
+                    effectiveDate
+                }
+
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = displayEffectiveDate,
+                        onValueChange = { },
+                        label = { Text("Tháng đề xuất áp dụng mức lương mới") },
+                        placeholder = { Text("Nhấp chọn tháng áp dụng") },
+                        singleLine = true,
+                        readOnly = true,
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.CalendarToday,
+                                contentDescription = "Select Month",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        },
+                        trailingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.DateRange,
+                                contentDescription = "Open Month Picker",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("salary_effective_date_input"),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clickable { showMonthPicker = true }
+                    )
+                }
+
                 // Reason for Salary adjustment
                 OutlinedTextField(
                     value = reason,
@@ -2937,7 +4080,8 @@ fun SubmitSalaryDialog(
                                     SalaryAdjustmentRequest(
                                         employeeName = it.name.trim(),
                                         currentSalary = it.currentSalary.toDoubleOrNull() ?: 0.0,
-                                        proposedSalary = it.proposedSalary.toDoubleOrNull() ?: 0.0
+                                        proposedSalary = it.proposedSalary.toDoubleOrNull() ?: 0.0,
+                                        salaryEffectiveDate = effectiveDate
                                     )
                                 }
                                 onSubmitMultiple(mapped, reason)
@@ -2957,6 +4101,173 @@ fun SubmitSalaryDialog(
 }
 
 // -----------------------------------------------------------------------------
+// TIMELINE COMPONENT FOR SALARY PROPOSAL APPROVALS (CAPTAIN, OFFICER, ADMIN)
+// -----------------------------------------------------------------------------
+enum class StepState {
+    COMPLETED, PENDING, REJECTED, DISABLED
+}
+
+@Composable
+fun TimelineStep(
+    title: String,
+    statusText: String,
+    descText: String,
+    state: StepState,
+    isLast: Boolean
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // Icon / Line Column
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.width(24.dp)
+        ) {
+            val (icon, color) = when (state) {
+                StepState.COMPLETED -> Icons.Default.CheckCircle to SuccessColor
+                StepState.PENDING -> Icons.Default.HourglassEmpty to WarningColor
+                StepState.REJECTED -> Icons.Default.Cancel to ErrorColor
+                StepState.DISABLED -> Icons.Default.RadioButtonUnchecked to Color.Gray
+            }
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(24.dp)
+            )
+            if (!isLast) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Box(
+                    modifier = Modifier
+                        .width(2.dp)
+                        .height(36.dp)
+                        .background(color.copy(alpha = 0.5f))
+                )
+            }
+        }
+
+        // Info Column
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                color = if (state == StepState.DISABLED) Color.Gray else MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = statusText,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = when (state) {
+                    StepState.COMPLETED -> SuccessColor
+                    StepState.PENDING -> WarningColor
+                    StepState.REJECTED -> ErrorColor
+                    StepState.DISABLED -> Color.Gray
+                }
+            )
+            if (descText.isNotBlank()) {
+                Text(
+                    text = descText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ProposalApprovalTimeline(proposal: Proposal) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = "TIẾN TRÌNH PHÊ DUYỆT ĐỀ XUẤT",
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.ExtraBold),
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            // Step 1: Initiated by Captain
+            TimelineStep(
+                title = "Bước 1: Đội trưởng đề xuất",
+                statusText = "Đã gửi đề xuất",
+                descText = "Đội trưởng: ${proposal.proposerName}",
+                state = StepState.COMPLETED,
+                isLast = false
+            )
+
+            // Step 2: Officer Approval
+            val step2State = when (proposal.status) {
+                "RECEIVED" -> StepState.PENDING
+                "OFFICER_APPROVED", "APPROVED", "ADMIN_REJECTED" -> StepState.COMPLETED
+                "REJECTED" -> StepState.REJECTED
+                else -> StepState.PENDING
+            }
+            val step2StatusText = when (proposal.status) {
+                "RECEIVED" -> "Đang chờ Nghiệp vụ duyệt"
+                "OFFICER_APPROVED", "APPROVED", "ADMIN_REJECTED" -> "Nghiệp vụ đã duyệt"
+                "REJECTED" -> "Nghiệp vụ đã từ chối"
+                else -> "Chờ xử lý"
+            }
+            val step2Desc = if (proposal.officerName != null) {
+                if (proposal.status == "REJECTED" && !proposal.rejectReason.isNullOrBlank()) {
+                    "Cán bộ: ${proposal.officerName}\nLý do từ chối: ${proposal.rejectReason}"
+                } else {
+                    "Cán bộ: ${proposal.officerName}"
+                }
+            } else {
+                "Chờ phân phối hồ sơ"
+            }
+            TimelineStep(
+                title = "Bước 2: Cán bộ phòng Nghiệp vụ",
+                statusText = step2StatusText,
+                descText = step2Desc,
+                state = step2State,
+                isLast = false
+            )
+
+            // Step 3: Admin / Director Approval
+            val step3State = when (proposal.status) {
+                "RECEIVED" -> StepState.DISABLED
+                "OFFICER_APPROVED" -> StepState.PENDING
+                "APPROVED" -> StepState.COMPLETED
+                "ADMIN_REJECTED" -> StepState.REJECTED
+                "REJECTED" -> StepState.DISABLED
+                else -> StepState.DISABLED
+            }
+            val step3StatusText = when (proposal.status) {
+                "RECEIVED" -> "Chưa đến lượt (Chờ bước 2)"
+                "OFFICER_APPROVED" -> "Đang chờ Giám đốc duyệt"
+                "APPROVED" -> "Giám đốc đã phê duyệt"
+                "ADMIN_REJECTED" -> "Giám đốc đã từ chối"
+                "REJECTED" -> "Hồ sơ đã bị từ chối ở bước 2"
+                else -> "Chờ xử lý"
+            }
+            val step3Desc = when (proposal.status) {
+                "APPROVED" -> "Đơn đề xuất lương đã được áp dụng"
+                "ADMIN_REJECTED" -> if (!proposal.rejectReason.isNullOrBlank()) "Lý do: ${proposal.rejectReason}" else "Giám đốc từ chối phê duyệt"
+                "OFFICER_APPROVED" -> "Hồ sơ đang ở bàn làm việc Giám đốc"
+                else -> ""
+            }
+            TimelineStep(
+                title = "Bước 3: Giám đốc (Admin) phê duyệt",
+                statusText = step3StatusText,
+                descText = step3Desc,
+                state = step3State,
+                isLast = true
+            )
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
 // DETAIL VIEWER AND REVIEW DIALOGUE (OFFICER ACTION SUPPORT)
 // -----------------------------------------------------------------------------
 @OptIn(ExperimentalMaterial3Api::class)
@@ -2965,11 +4276,15 @@ fun ProposalDetailDialog(
     proposal: Proposal,
     onDismiss: () -> Unit,
     isOfficer: Boolean,
-    onApprove: () -> Unit,
+    onApprove: (adjustedDate: String?, adjustedProposedSalary: Double?, adjustedSalaryEffectiveDate: String?) -> Unit,
     onReject: (String) -> Unit
 ) {
     var rejectReason by remember { mutableStateOf("") }
     var showRejectReasonInput by remember { mutableStateOf(false) }
+    var adjustedLeaveDate by remember { mutableStateOf(proposal.leaveDate ?: "") }
+    var adjustedProposedSalary by remember { mutableStateOf(proposal.proposedSalary?.toLong()?.toString() ?: "") }
+    var adjustedSalaryEffectiveDate by remember { mutableStateOf(proposal.salaryEffectiveDate ?: "") }
+    var showAdjustedSalaryMonthPicker by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -3038,22 +4353,62 @@ fun ProposalDetailDialog(
                         // If Leave type, show remaining days
                         if (proposal.type == "LEAVE" && proposal.leaveDate != null) {
                             val daysRemaining = calculateDaysRemaining(proposal.leaveDate)
-                            val leaveLabel = if (proposal.leaveType == "RESIGNATION") "Ngày thôi việc dự kiến" else "Ngày nghỉ phép dự kiến"
+                            val isLeaveNotResign = proposal.leaveType != "RESIGNATION"
+                            val leaveLabel = if (isLeaveNotResign) "Bắt đầu nghỉ phép" else "Ngày thôi việc dự kiến"
                             val countdownDesc = if (daysRemaining > 0) "CÒN LẠI: $daysRemaining NGÀY" else "ĐÃ ĐẾN HẠN NGHỈ"
                             val accentColor = if (daysRemaining <= 3) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.HourglassBottom,
-                                    contentDescription = "Timer",
-                                    tint = accentColor
-                                )
-                                Text(
-                                    text = "$leaveLabel: ${proposal.leaveDate} ($countdownDesc)",
-                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.ExtraBold, color = accentColor)
-                                )
+                            
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.HourglassBottom,
+                                        contentDescription = "Timer",
+                                        tint = accentColor
+                                    )
+                                    Text(
+                                        text = "$leaveLabel: ${proposal.leaveDate} ($countdownDesc)",
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.ExtraBold, color = accentColor)
+                                    )
+                                }
+                                if (isLeaveNotResign && proposal.leaveEndDate != null) {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(start = 32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.CalendarToday,
+                                            contentDescription = "End Date",
+                                            tint = MaterialTheme.colorScheme.secondary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = "Kết thúc nghỉ phép: ${proposal.leaveEndDate}",
+                                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                                        )
+                                    }
+                                    
+                                    val duration = calculateLeaveDurationDays(proposal.leaveDate, proposal.leaveEndDate)
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(start = 32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.DateRange,
+                                            contentDescription = "Duration",
+                                            tint = MaterialTheme.colorScheme.tertiary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = "Tổng số ngày nghỉ: $duration ngày",
+                                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.tertiary)
+                                        )
+                                    }
+                                }
                             }
                         }
 
@@ -3092,6 +4447,31 @@ fun ProposalDetailDialog(
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
                             }
+
+                            proposal.salaryEffectiveDate?.let { effDate ->
+                                val formattedDate = try {
+                                    val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(effDate)
+                                    date?.let { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(it) } ?: effDate
+                                } catch (e: Exception) {
+                                    effDate
+                                }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.padding(top = 4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CalendarToday,
+                                        contentDescription = "Effective Date",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "Ngày đề xuất áp dụng: $formattedDate",
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                    )
+                                }
+                            }
                         }
 
                         Text(
@@ -3114,6 +4494,7 @@ fun ProposalDetailDialog(
                         employeeName = proposal.employeeName,
                         leaveType = proposal.leaveType ?: "LEAVE",
                         leaveDateStr = proposal.leaveDate ?: "",
+                        leaveEndDateStr = proposal.leaveEndDate,
                         reason = proposal.reason,
                         captainName = proposal.proposerName,
                         status = proposal.status,
@@ -3224,8 +4605,11 @@ fun ProposalDetailDialog(
                     }
                 }
 
-                // If already reviewed, show review status and officer feedback
-                if (proposal.status != "RECEIVED") {
+                // If SALARY proposal, show the gorgeous multi-step progress timeline
+                if (proposal.type == "SALARY") {
+                    ProposalApprovalTimeline(proposal = proposal)
+                } else if (proposal.status != "RECEIVED") {
+                    // Original review feedback card for leave proposals
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
@@ -3264,8 +4648,248 @@ fun ProposalDetailDialog(
                     }
                 }
 
-                // If logged in as OFFICER and state is PENDING, show Action workflows!
-                if (isOfficer && proposal.status == "RECEIVED") {
+                // If logged in as OFFICER/ADMIN and state is PENDING, show Action workflows!
+                if (isOfficer && (proposal.status == "RECEIVED" || proposal.status == "OFFICER_APPROVED")) {
+                    if (proposal.type == "LEAVE" && proposal.status == "RECEIVED" && !showRejectReasonInput) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "Phê duyệt ngày khác đề xuất (nếu có)",
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "Mặc định lấy ngày đề xuất của Đội trưởng (${proposal.leaveDate}). Cán bộ có thể nhấp chọn ngày khác nếu cần điều chỉnh ngày chính thức.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.Gray
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                
+                                val context = LocalContext.current
+                                val calendar = Calendar.getInstance()
+                                val initialYear: Int
+                                val initialMonth: Int
+                                val initialDay: Int
+                                if (adjustedLeaveDate.trim().length == 10 && adjustedLeaveDate.contains("-")) {
+                                    val parts = adjustedLeaveDate.split("-")
+                                    initialYear = parts.getOrNull(0)?.toIntOrNull() ?: calendar.get(Calendar.YEAR)
+                                    initialMonth = (parts.getOrNull(1)?.toIntOrNull() ?: (calendar.get(Calendar.MONTH) + 1)) - 1
+                                    initialDay = parts.getOrNull(2)?.toIntOrNull() ?: calendar.get(Calendar.DAY_OF_MONTH)
+                                } else {
+                                    initialYear = calendar.get(Calendar.YEAR)
+                                    initialMonth = calendar.get(Calendar.MONTH)
+                                    initialDay = calendar.get(Calendar.DAY_OF_MONTH)
+                                }
+
+                                val datePickerDialog = remember(context) {
+                                    android.app.DatePickerDialog(
+                                        context,
+                                        { _, year, monthOfYear, dayOfMonth ->
+                                            val formattedMonth = String.format("%02d", monthOfYear + 1)
+                                            val formattedDay = String.format("%02d", dayOfMonth)
+                                            adjustedLeaveDate = "$year-$formattedMonth-$formattedDay"
+                                        },
+                                        initialYear,
+                                        initialMonth,
+                                        initialDay
+                                    )
+                                }
+
+                                LaunchedEffect(adjustedLeaveDate) {
+                                    if (adjustedLeaveDate.trim().length == 10 && adjustedLeaveDate.contains("-")) {
+                                        val parts = adjustedLeaveDate.split("-")
+                                        val y = parts.getOrNull(0)?.toIntOrNull()
+                                        val m = parts.getOrNull(1)?.toIntOrNull()
+                                        val d = parts.getOrNull(2)?.toIntOrNull()
+                                        if (y != null && m != null && d != null) {
+                                            datePickerDialog.updateDate(y, m - 1, d)
+                                        }
+                                    }
+                                }
+
+                                Box(modifier = Modifier.fillMaxWidth()) {
+                                    OutlinedTextField(
+                                        value = adjustedLeaveDate,
+                                        onValueChange = { },
+                                        label = { Text("Ngày phê duyệt quyết định") },
+                                        placeholder = { Text("Nhấp chọn ngày") },
+                                        singleLine = true,
+                                        readOnly = true,
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Default.CalendarToday,
+                                                contentDescription = "Select Date",
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        },
+                                        trailingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Default.DateRange,
+                                                contentDescription = "Open Calendar Picker",
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("officer_adjusted_date_input"),
+                                        shape = RoundedCornerShape(10.dp)
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .matchParentSize()
+                                            .clickable { datePickerDialog.show() }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (proposal.type == "SALARY" && !showRejectReasonInput) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "Phê duyệt mức lương & tháng áp dụng khác (nếu có)",
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                val formattedOriginalDate = try {
+                                    val effDate = proposal.salaryEffectiveDate ?: ""
+                                    if (effDate.length == 7 && effDate.contains("-")) {
+                                        val parts = effDate.split("-")
+                                        "Tháng ${parts.getOrNull(1)}/${parts.getOrNull(0)}"
+                                    } else {
+                                        effDate
+                                    }
+                                } catch(e: Exception) {
+                                    proposal.salaryEffectiveDate ?: ""
+                                }
+                                Text(
+                                    text = "Mặc định lấy mức lương đề xuất (${proposal.proposedSalary?.let { DecimalFormat("#,###").format(it) } ?: ""} VNĐ) và tháng áp dụng ($formattedOriginalDate). Cán bộ có thể điều chỉnh lại bên dưới.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.Gray
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                
+                                // Salary Input
+                                OutlinedTextField(
+                                    value = adjustedProposedSalary,
+                                    onValueChange = { input ->
+                                        if (input.all { it.isDigit() }) {
+                                            adjustedProposedSalary = input
+                                        }
+                                    },
+                                    label = { Text("Mức lương quyết định (VNĐ)") },
+                                    placeholder = { Text("Ví dụ: 9500000") },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("officer_adjusted_salary_input"),
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                // Month/Year Picker instead of DatePickerDialog
+                                val calendar = Calendar.getInstance()
+                                val initialYear: Int
+                                val initialMonth: Int
+                                if (adjustedSalaryEffectiveDate.contains("-")) {
+                                    val parts = adjustedSalaryEffectiveDate.split("-")
+                                    initialYear = parts.getOrNull(0)?.toIntOrNull() ?: calendar.get(Calendar.YEAR)
+                                    initialMonth = parts.getOrNull(1)?.toIntOrNull() ?: (calendar.get(Calendar.MONTH) + 1)
+                                } else {
+                                    initialYear = calendar.get(Calendar.YEAR)
+                                    initialMonth = calendar.get(Calendar.MONTH) + 1
+                                }
+
+                                if (showAdjustedSalaryMonthPicker) {
+                                    MonthYearPickerDialog(
+                                        initialYear = initialYear,
+                                        initialMonth = initialMonth,
+                                        onDismiss = { showAdjustedSalaryMonthPicker = false },
+                                        onDateSelected = { year, month ->
+                                            val formattedMonth = String.format("%02d", month)
+                                            adjustedSalaryEffectiveDate = "$year-$formattedMonth"
+                                            showAdjustedSalaryMonthPicker = false
+                                        }
+                                    )
+                                }
+
+                                val displayAdjustedDate = try {
+                                    if (adjustedSalaryEffectiveDate.contains("-")) {
+                                        val parts = adjustedSalaryEffectiveDate.split("-")
+                                        val y = parts.getOrNull(0) ?: ""
+                                        val m = parts.getOrNull(1) ?: ""
+                                        if (y.isNotEmpty() && m.isNotEmpty()) {
+                                            if (parts.size == 3) {
+                                                // If it is old yyyy-MM-dd format, display dd/MM/yyyy
+                                                val d = parts.getOrNull(2) ?: ""
+                                                "$d/$m/$y"
+                                            } else {
+                                                "Tháng $m/$y"
+                                            }
+                                        } else {
+                                            adjustedSalaryEffectiveDate
+                                        }
+                                    } else {
+                                        adjustedSalaryEffectiveDate
+                                    }
+                                } catch (e: Exception) {
+                                    adjustedSalaryEffectiveDate
+                                }
+
+                                Box(modifier = Modifier.fillMaxWidth()) {
+                                    OutlinedTextField(
+                                        value = displayAdjustedDate,
+                                        onValueChange = { },
+                                        label = { Text("Tháng áp dụng quyết định") },
+                                        placeholder = { Text("Nhấp chọn tháng áp dụng") },
+                                        singleLine = true,
+                                        readOnly = true,
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Default.CalendarToday,
+                                                contentDescription = "Select Month",
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        },
+                                        trailingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Default.DateRange,
+                                                contentDescription = "Open Month Picker",
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("officer_adjusted_salary_date_input"),
+                                        shape = RoundedCornerShape(10.dp)
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .matchParentSize()
+                                            .clickable { showAdjustedSalaryMonthPicker = true }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     if (!showRejectReasonInput) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -3286,7 +4910,17 @@ fun ProposalDetailDialog(
                             }
 
                             Button(
-                                onClick = onApprove,
+                                onClick = {
+                                    if (proposal.type == "SALARY") {
+                                        onApprove(
+                                            null,
+                                            adjustedProposedSalary.toDoubleOrNull(),
+                                            adjustedSalaryEffectiveDate
+                                        )
+                                    } else {
+                                        onApprove(adjustedLeaveDate, null, null)
+                                    }
+                                },
                                 modifier = Modifier
                                     .weight(1.5f)
                                     .height(50.dp)
@@ -3365,7 +4999,7 @@ fun AddNewUserDialog(
     var password by remember { mutableStateOf("") }
     var role by remember { mutableStateOf("CAPTAIN") }
 
-    val isFormValid = cccd.length == 12 && fullName.isNotBlank() && password.isNotBlank() && assignedLocation.isNotBlank()
+    val isFormValid = cccd.length == 12 && fullName.isNotBlank() && password.isNotBlank() && (role != "CAPTAIN" || assignedLocation.isNotBlank())
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -3376,7 +5010,9 @@ fun AddNewUserDialog(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(
-                modifier = Modifier.padding(20.dp),
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Text(
@@ -3391,7 +5027,11 @@ fun AddNewUserDialog(
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(
-                        text = "Nhập đầy đủ thông tin tài khoản mới để cấp quyền trực tiếp cho Đội trưởng hoặc Cán bộ nghiệp vụ.",
+                        text = if (role == "CAPTAIN") {
+                            "Cấp quyền Đội trưởng: Vui lòng nhập thông tin cá nhân và Mục tiêu quản lý được phân công."
+                        } else {
+                            "Cấp quyền Cán bộ: Nhập CCCD, Họ tên và Mật khẩu (không cần nhập Mục tiêu quản lý)."
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(12.dp)
@@ -3423,16 +5063,45 @@ fun AddNewUserDialog(
                     shape = RoundedCornerShape(12.dp)
                 )
 
-                // Assigned Location
-                OutlinedTextField(
-                    value = assignedLocation,
-                    onValueChange = { assignedLocation = it },
-                    label = { Text("Mục tiêu quản lý / Vận hành") },
-                    placeholder = { Text("Ví dụ: Ngày & Đêm Security, Landmark 81...") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().testTag("add_user_location"),
-                    shape = RoundedCornerShape(12.dp)
-                )
+                Text("Vai trò phân quyền:", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    ElevatedFilterChip(
+                        selected = role == "CAPTAIN",
+                        onClick = { role = "CAPTAIN" },
+                        label = { Text("Đội Trưởng", style = MaterialTheme.typography.bodySmall) },
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    ElevatedFilterChip(
+                        selected = role == "OFFICER",
+                        onClick = { role = "OFFICER" },
+                        label = { Text("CB Nghiệp Vụ", style = MaterialTheme.typography.bodySmall) },
+                        modifier = Modifier.weight(1.5f)
+                    )
+
+                    ElevatedFilterChip(
+                        selected = role == "DISCIPLINE",
+                        onClick = { role = "DISCIPLINE" },
+                        label = { Text("CB Điều Lệnh", style = MaterialTheme.typography.bodySmall) },
+                        modifier = Modifier.weight(1.5f)
+                    )
+                }
+
+                // Assigned Location - Only for Captain
+                if (role == "CAPTAIN") {
+                    OutlinedTextField(
+                        value = assignedLocation,
+                        onValueChange = { assignedLocation = it },
+                        label = { Text("Mục tiêu quản lý / Vận hành *") },
+                        placeholder = { Text("Ví dụ: Ngày & Đêm Security, Landmark 81...") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().testTag("add_user_location"),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
 
                 // Password
                 OutlinedTextField(
@@ -3444,26 +5113,6 @@ fun AddNewUserDialog(
                     modifier = Modifier.fillMaxWidth().testTag("add_user_password"),
                     shape = RoundedCornerShape(12.dp)
                 )
-
-                Text("Vai trò phân quyền:", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    ElevatedFilterChip(
-                        selected = role == "CAPTAIN",
-                        onClick = { role = "CAPTAIN" },
-                        label = { Text("Đội Trưởng (Captain)") },
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    ElevatedFilterChip(
-                        selected = role == "OFFICER",
-                        onClick = { role = "OFFICER" },
-                        label = { Text("CB Nghiệp Vụ (Officer)") },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -3480,7 +5129,12 @@ fun AddNewUserDialog(
                     Button(
                         onClick = {
                             if (isFormValid) {
-                                onSubmit(cccd, fullName, role, password, assignedLocation)
+                                val finalLocation = when (role) {
+                                    "OFFICER" -> "Phòng Nghiệp vụ"
+                                    "DISCIPLINE" -> "Phòng Điều lệnh"
+                                    else -> assignedLocation.trim()
+                                }
+                                onSubmit(cccd, fullName, role, password, finalLocation)
                             }
                         },
                         modifier = Modifier.weight(1.5f),
@@ -3489,6 +5143,106 @@ fun AddNewUserDialog(
                     ) {
                         Text("XÁC NHẬN")
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MonthYearPickerDialog(
+    initialYear: Int,
+    initialMonth: Int, // 1-indexed (1 to 12)
+    onDismiss: () -> Unit,
+    onDateSelected: (year: Int, month: Int) -> Unit
+) {
+    var selectedYear by remember { mutableStateOf(initialYear) }
+    
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "Chọn Tháng & Năm",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                // Year selector row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { selectedYear-- }) {
+                        Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Previous Year")
+                    }
+                    Text(
+                        text = "$selectedYear",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    IconButton(onClick = { selectedYear++ }) {
+                        Icon(imageVector = Icons.Default.ArrowForward, contentDescription = "Next Year")
+                    }
+                }
+
+                // Grid of 12 months
+                val monthsList = listOf(
+                    "Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4",
+                    "Tháng 5", "Tháng 6", "Tháng 7", "Tháng 8",
+                    "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"
+                )
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (row in 0 until 4) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            for (col in 0 until 3) {
+                                val monthIndex = row * 3 + col // 0-indexed
+                                val monthNum = monthIndex + 1
+                                val isSelected = monthNum == initialMonth
+                                
+                                Button(
+                                    onClick = {
+                                        onDateSelected(selectedYear, monthNum)
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                        contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.weight(1f),
+                                    contentPadding = PaddingValues(4.dp)
+                                ) {
+                                    Text(
+                                        text = monthsList[monthIndex],
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text("ĐÓNG", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold))
                 }
             }
         }

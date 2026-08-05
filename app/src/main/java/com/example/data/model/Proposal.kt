@@ -12,9 +12,11 @@ data class Proposal(
     val type: String, // "LEAVE", "SALARY"
     val leaveType: String? = null, // "LEAVE" (Nghỉ phép), "RESIGNATION" (Nghỉ việc)
     val leaveDate: String? = null, // YYYY-MM-DD
+    val leaveEndDate: String? = null, // YYYY-MM-DD (End date of leave, optional)
     val imagePath: String? = null, // Base64 or local description or drawing
     val currentSalary: Double? = null,
     val proposedSalary: Double? = null,
+    val salaryEffectiveDate: String? = null,
     val reason: String,
     val status: String, // "RECEIVED", "APPROVED", "REJECTED"
     val officerCccd: String? = null,

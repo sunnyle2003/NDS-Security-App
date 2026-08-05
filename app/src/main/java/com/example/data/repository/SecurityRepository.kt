@@ -2,16 +2,40 @@ package com.example.data.repository
 
 import com.example.data.local.ProposalDao
 import com.example.data.local.UserDao
+import com.example.data.local.ViolationDao
 import com.example.data.model.Proposal
 import com.example.data.model.User
+import com.example.data.model.Violation
 import kotlinx.coroutines.flow.Flow
 
 class SecurityRepository(
     private val userDao: UserDao,
-    private val proposalDao: ProposalDao
+    private val proposalDao: ProposalDao,
+    private val violationDao: ViolationDao
 ) {
     val allUsers: Flow<List<User>> = userDao.getAllUsers()
     val allProposals: Flow<List<Proposal>> = proposalDao.getAllProposals()
+    val allViolations: Flow<List<Violation>> = violationDao.getAllViolations()
+
+    fun getViolationsByReporter(reporterCccd: String): Flow<List<Violation>> {
+        return violationDao.getViolationsByReporter(reporterCccd)
+    }
+
+    suspend fun getViolationById(id: Int): Violation? {
+        return violationDao.getViolationById(id)
+    }
+
+    suspend fun insertViolation(violation: Violation) {
+        violationDao.insertViolation(violation)
+    }
+
+    suspend fun updateViolation(violation: Violation) {
+        violationDao.updateViolation(violation)
+    }
+
+    suspend fun deleteViolation(violation: Violation) {
+        violationDao.deleteViolation(violation)
+    }
 
     fun getProposalsByProposer(proposerCccd: String): Flow<List<Proposal>> {
         return proposalDao.getProposalsByProposer(proposerCccd)
