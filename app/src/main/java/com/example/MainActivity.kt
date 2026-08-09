@@ -12,6 +12,7 @@ import java.io.FileOutputStream
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.animation.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -76,6 +77,8 @@ import java.text.DecimalFormat
 import java.text.SimpleDateFormat
 import java.util.*
 
+import com.example.data.remote.SyncState
+
 class MainActivity : ComponentActivity() {
     private val viewModel: SecurityViewModel by viewModels {
         SecurityViewModelFactory(application)
@@ -107,6 +110,7 @@ fun SecurityAppMain(
 ) {
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val pendingRegistrationCccd by viewModel.pendingRegistrationCccd.collectAsStateWithLifecycle()
+    val isCloudConfigOpen by viewModel.isCloudConfigOpen.collectAsStateWithLifecycle()
 
     Box(
         modifier = modifier
@@ -114,11 +118,7 @@ fun SecurityAppMain(
             .background(MaterialTheme.colorScheme.background)
     ) {
         AnimatedContent(
-            targetState = when {
-                currentUser != null -> ScreenState.DASHBOARD
-                pendingRegistrationCccd != null -> ScreenState.FIRST_TIME_SETUP
-                else -> ScreenState.LOGIN
-            },
+            targetState = if (currentUser != null) ScreenState.DASHBOARD else ScreenState.LOGIN,
             transitionSpec = {
                 fadeIn() + slideInHorizontally() togetherWith fadeOut() + slideOutHorizontally()
             },
@@ -127,12 +127,6 @@ fun SecurityAppMain(
             when (targetState) {
                 ScreenState.LOGIN -> {
                     LoginScreen(viewModel = viewModel)
-                }
-                ScreenState.FIRST_TIME_SETUP -> {
-                    FirstTimeSetupScreen(
-                        cccd = pendingRegistrationCccd ?: "",
-                        viewModel = viewModel
-                    )
                 }
                 ScreenState.DASHBOARD -> {
                     val user = currentUser
@@ -152,7 +146,6 @@ fun SecurityAppMain(
 
 enum class ScreenState {
     LOGIN,
-    FIRST_TIME_SETUP,
     DASHBOARD
 }
 
@@ -171,22 +164,22 @@ fun LoginScreen(viewModel: SecurityViewModel) {
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(24.dp),
+            .padding(20.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .widthIn(max = 450.dp),
+                .widthIn(max = 480.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             
             // Custom drawn elegant company logo badge
-            SecurityBadgeLogo(modifier = Modifier.size(140.dp))
+            SecurityBadgeLogo(modifier = Modifier.size(120.dp))
             
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             Text(
                 text = "NGÀY & ĐÊM SECURITY",
@@ -200,12 +193,12 @@ fun LoginScreen(viewModel: SecurityViewModel) {
 
             Text(
                 text = "Hệ thống Quản lý Vận hành Nghiệp vụ",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f),
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -213,7 +206,7 @@ fun LoginScreen(viewModel: SecurityViewModel) {
                     containerColor = MaterialTheme.colorScheme.surface
                 ),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
                 shape = RoundedCornerShape(24.dp)
             ) {
                 Column(
@@ -237,8 +230,9 @@ fun LoginScreen(viewModel: SecurityViewModel) {
                         value = cccd,
                         onValueChange = { input ->
                             // Allow only digits and limit to 12
-                            if (input.all { it.isDigit() } && input.length <= 12) {
-                                cccd = input
+                            val digits = input.filter { it.isDigit() }
+                            if (digits.length <= 12) {
+                                cccd = digits
                             }
                         },
                         label = { Text("Số CCCD (12 chữ số)") },
@@ -287,13 +281,30 @@ fun LoginScreen(viewModel: SecurityViewModel) {
 
                     // Show validation error
                     if (loginError != null) {
-                        Text(
-                            text = loginError!!,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                            textAlign = TextAlign.Center,
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.3f)),
                             modifier = Modifier.fillMaxWidth()
-                        )
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = "Error",
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Text(
+                                    text = loginError!!,
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold)
+                                )
+                            }
+                        }
                     }
 
                     Button(
@@ -309,10 +320,544 @@ fun LoginScreen(viewModel: SecurityViewModel) {
                             containerColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
+                        Icon(imageVector = Icons.Default.Login, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "ĐĂNG NHẬP",
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                         )
+                    }
+
+                    // Discreet notice for users
+                    Text(
+                        text = "ℹ️ Tài khoản nhân viên do Quản trị viên hệ thống cấp. Vui lòng liên hệ Admin nếu chưa có tài khoản hoặc quên mật khẩu.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
+
+// Official company logo badge using embedded/network image with graceful vector fallback
+@Composable
+fun SecurityBadgeLogo(modifier: Modifier = Modifier) {
+    SubcomposeAsyncImage(
+        model = "https://i.ibb.co/fzhxZv5H/z7997808820598-c1f98aab385f7f198efebdd2a8b84471.jpg",
+        contentDescription = "Night Day Security Logo",
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp)),
+        contentScale = ContentScale.Fit,
+        loading = {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    strokeWidth = 2.dp
+                )
+            }
+        },
+        error = {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        MaterialTheme.colorScheme.primaryContainer,
+                        RoundedCornerShape(16.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Shield,
+                    contentDescription = "Security Shield",
+                    modifier = Modifier.size(48.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    )
+}
+
+// -----------------------------------------------------------------------------
+// CLOUD / FIREBASE SYNCHRONIZATION UI COMPONENTS
+// -----------------------------------------------------------------------------
+@Composable
+fun CloudSyncStatusBar(
+    viewModel: SecurityViewModel,
+    modifier: Modifier = Modifier
+) {
+    val syncState by viewModel.syncState.collectAsStateWithLifecycle()
+    val syncMessage by viewModel.syncStatusMessage.collectAsStateWithLifecycle()
+    val lastSyncTime by viewModel.lastSyncTime.collectAsStateWithLifecycle()
+
+    val timeFormatted = if (lastSyncTime > 0) {
+        val sdf = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+        sdf.format(Date(lastSyncTime))
+    } else "Chưa có"
+
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = when (syncState) {
+                SyncState.SYNCING -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                SyncState.SUCCESS -> SuccessColor.copy(alpha = 0.12f)
+                SyncState.ERROR -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
+                SyncState.IDLE -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+            }
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                when (syncState) {
+                    SyncState.SYNCING -> {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    SyncState.SUCCESS -> {
+                        Icon(
+                            imageVector = Icons.Default.CloudDone,
+                            contentDescription = "Cloud Synced",
+                            tint = SuccessColor,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    SyncState.ERROR -> {
+                        Icon(
+                            imageVector = Icons.Default.CloudOff,
+                            contentDescription = "Cloud Offline",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    SyncState.IDLE -> {
+                        Icon(
+                            imageVector = Icons.Default.Cloud,
+                            contentDescription = "Cloud Ready",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                Column {
+                    Text(
+                        text = when (syncState) {
+                            SyncState.SYNCING -> "Đang đồng bộ dữ liệu đám mây..."
+                            SyncState.SUCCESS -> "🟢 Đã đồng bộ Cloud/Firebase ($timeFormatted)"
+                            SyncState.ERROR -> "⚠️ Ngoại tuyến / Lỗi kết nối đám mây"
+                            SyncState.IDLE -> "☁️ Đồng bộ Cloud/Firebase ($timeFormatted)"
+                        },
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = syncMessage,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                IconButton(
+                    onClick = { viewModel.triggerManualSync() },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Sync,
+                        contentDescription = "Sync Now",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                IconButton(
+                    onClick = { viewModel.toggleCloudConfigDialog(true) },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "Cloud Settings",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CloudSyncBadge(viewModel: SecurityViewModel, modifier: Modifier = Modifier) {
+    val syncState by viewModel.syncState.collectAsStateWithLifecycle()
+    
+    Surface(
+        onClick = { viewModel.toggleCloudConfigDialog(true) },
+        shape = RoundedCornerShape(12.dp),
+        color = when (syncState) {
+            SyncState.SYNCING -> MaterialTheme.colorScheme.primaryContainer
+            SyncState.SUCCESS -> SuccessColor.copy(alpha = 0.15f)
+            SyncState.ERROR -> MaterialTheme.colorScheme.errorContainer
+            SyncState.IDLE -> MaterialTheme.colorScheme.surfaceVariant
+        },
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            when (syncState) {
+                SyncState.SYNCING -> CircularProgressIndicator(
+                    modifier = Modifier.size(12.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                SyncState.SUCCESS -> Icon(
+                    imageVector = Icons.Default.CloudDone,
+                    contentDescription = "Cloud Synced",
+                    tint = SuccessColor,
+                    modifier = Modifier.size(14.dp)
+                )
+                SyncState.ERROR -> Icon(
+                    imageVector = Icons.Default.CloudOff,
+                    contentDescription = "Cloud Error",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(14.dp)
+                )
+                SyncState.IDLE -> Icon(
+                    imageVector = Icons.Default.Cloud,
+                    contentDescription = "Cloud Ready",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+            Text(
+                text = when (syncState) {
+                    SyncState.SYNCING -> "Đang đồng bộ..."
+                    SyncState.SUCCESS -> "Cloud: Đã đồng bộ"
+                    SyncState.ERROR -> "Cloud: Ngoại tuyến"
+                    SyncState.IDLE -> "Cloud: Sẵn sàng"
+                },
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                color = when (syncState) {
+                    SyncState.SUCCESS -> SuccessColor
+                    SyncState.ERROR -> MaterialTheme.colorScheme.error
+                    else -> MaterialTheme.colorScheme.onSurface
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun CloudConfigDialog(viewModel: SecurityViewModel) {
+    val currentUrl by viewModel.firebaseUrl.collectAsStateWithLifecycle()
+    var inputUrl by remember(currentUrl) { mutableStateOf(currentUrl) }
+    val syncState by viewModel.syncState.collectAsStateWithLifecycle()
+    val syncMessage by viewModel.syncStatusMessage.collectAsStateWithLifecycle()
+    val lastSyncTime by viewModel.lastSyncTime.collectAsStateWithLifecycle()
+    val testResult by viewModel.testResult.collectAsStateWithLifecycle()
+    var isTestingConnection by remember { mutableStateOf(false) }
+    var showInstructions by remember { mutableStateOf(true) }
+
+    val timeFormatted = if (lastSyncTime > 0) {
+        val sdf = SimpleDateFormat("HH:mm:ss dd/MM/yyyy", Locale.getDefault())
+        sdf.format(Date(lastSyncTime))
+    } else "Chưa đồng bộ"
+
+    Dialog(onDismissRequest = { viewModel.toggleCloudConfigDialog(false) }) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(4.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CloudSync,
+                            contentDescription = "Cloud Sync Icon",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(28.dp)
+                        )
+                        Text(
+                            text = "Đồng Bộ Đám Mây Trực Tuyến",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    IconButton(onClick = { viewModel.toggleCloudConfigDialog(false) }) {
+                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
+                    }
+                }
+
+                // Current Sync Status Box
+                Surface(
+                    color = when (syncState) {
+                        SyncState.SUCCESS -> SuccessColor.copy(alpha = 0.12f)
+                        SyncState.ERROR -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f)
+                        SyncState.SYNCING -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                        SyncState.IDLE -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            when (syncState) {
+                                SyncState.SUCCESS -> Icon(Icons.Default.CloudDone, contentDescription = null, tint = SuccessColor, modifier = Modifier.size(16.dp))
+                                SyncState.ERROR -> Icon(Icons.Default.CloudOff, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                                SyncState.SYNCING -> CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                                SyncState.IDLE -> Icon(Icons.Default.Cloud, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                            }
+                            Text(
+                                text = "Trạng thái: $syncMessage",
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Text(
+                            text = "Lần đồng bộ gần nhất: $timeFormatted",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                // URL Input Field
+                OutlinedTextField(
+                    value = inputUrl,
+                    onValueChange = { inputUrl = it },
+                    label = { Text("Firebase Realtime Database URL") },
+                    placeholder = { Text("https://gen-lang-client-0615295150-default-rtdb.firebaseio.com") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    trailingIcon = {
+                        IconButton(onClick = {
+                            inputUrl = "https://gen-lang-client-0615295150-default-rtdb.firebaseio.com"
+                        }) {
+                            Icon(imageVector = Icons.Default.RestartAlt, contentDescription = "Reset default")
+                        }
+                    }
+                )
+
+                // Quick Presets
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            inputUrl = "https://gen-lang-client-0615295150-default-rtdb.firebaseio.com"
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
+                    ) {
+                        Text("📍 Server Firebase Mặc Định (gen-lang-client)", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+
+                // Test Connection Button & Diagnostic
+                OutlinedButton(
+                    onClick = {
+                        isTestingConnection = true
+                        viewModel.testFirebaseConnection(inputUrl)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.NetworkCheck, contentDescription = "Test", modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("🔍 KIỂM TRA KẾT NỐI TRỰC TUYẾN (PING)")
+                }
+
+                // Test Connection Result Display
+                if (testResult != null) {
+                    val res = testResult!!
+                    Surface(
+                        color = if (res.isSuccess) SuccessColor.copy(alpha = 0.15f) else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, if (res.isSuccess) SuccessColor else MaterialTheme.colorScheme.error)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (res.isSuccess) Icons.Default.CheckCircle else Icons.Default.Error,
+                                    contentDescription = null,
+                                    tint = if (res.isSuccess) SuccessColor else MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = res.message,
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = if (res.isSuccess) SuccessColor else MaterialTheme.colorScheme.error
+                                )
+                            }
+                            Text(
+                                text = res.detail,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+
+                // Collapsible Step-by-Step Setup Guide
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showInstructions = !showInstructions },
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Icon(imageVector = Icons.Default.MenuBook, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                Text(
+                                    text = "📖 Hướng Dẫn Mở Quyền Online 100% (30s)",
+                                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            Icon(
+                                imageVector = if (showInstructions) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
+                        if (showInstructions) {
+                            Text(
+                                text = "Để app hoạt động online giữa tất cả các máy điện thoại, bạn cần mở quyền Realtime Database như sau:",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "1️⃣ Vào https://console.firebase.google.com -> Tạo project mới (hoặc chọn project có sẵn).\n" +
+                                        "2️⃣ Vào mục Build > Realtime Database > Create Database (chọn Singapore hoặc US).\n" +
+                                        "3️⃣ Vào Tab \"Rules\" và đổi thành:",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Surface(
+                                color = MaterialTheme.colorScheme.surface,
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                            ) {
+                                Text(
+                                    text = "{\n  \"rules\": {\n    \".read\": true,\n    \".write\": true\n  }\n}",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(10.dp)
+                                )
+                            }
+                            Text(
+                                text = "4️⃣ Nhấn nút \"Publish\". Sau đó copy URL Database và dán vào ô bên trên rồi bấm Lưu & Đồng Bộ!",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                // Action Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.triggerManualSync()
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.Sync, contentDescription = "Sync", modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Đồng bộ ngay")
+                    }
+
+                    Button(
+                        onClick = {
+                            viewModel.updateFirebaseUrl(inputUrl)
+                            viewModel.toggleCloudConfigDialog(false)
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Lưu & Kích hoạt")
                     }
                 }
             }
@@ -320,285 +865,51 @@ fun LoginScreen(viewModel: SecurityViewModel) {
     }
 }
 
-// Custom drawn shield and star logo with network remote support
-@Composable
-fun SecurityBadgeLogo(modifier: Modifier = Modifier) {
-    SubcomposeAsyncImage(
-        model = "https://i.ibb.co/dsKCJQ6w/images.jpg",
-        contentDescription = "Night Day Security Logo",
-        modifier = modifier,
-        loading = {
-            CircularProgressIndicator(
-                modifier = Modifier
-                    .size(24.dp)
-                    .align(Alignment.Center),
-                color = MaterialTheme.colorScheme.primary,
-                strokeWidth = 2.dp
-            )
-        },
-        error = {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                val goldColor = Color(0xFFEAB308) // Shiny gold
-                val skyBlueColor = Color(0xFF1E88E5) // Medium Sky Blue
-                val navyColor = Color(0xFF003B73) // Deep Navy
-
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val width = size.width
-                    val height = size.height
-                    val centerX = width / 2f
-                    val centerY = height / 2f
-
-                    // 1. Draw outer shield path
-                    val shieldPath = Path().apply {
-                        moveTo(width * 0.12f, height * 0.20f)
-                        quadraticTo(width * 0.5f, height * 0.10f, width * 0.88f, height * 0.20f)
-                        quadraticTo(width * 0.88f, height * 0.65f, width * 0.5f, height * 0.92f)
-                        quadraticTo(width * 0.12f, height * 0.65f, width * 0.12f, height * 0.20f)
-                        close()
-                    }
-
-                    // Draw shadow/outer gold border
-                    drawPath(
-                        path = shieldPath,
-                        color = goldColor,
-                        style = Stroke(width = 6.dp.toPx())
-                    )
-
-                    // Clip drawing inside the shield so we don't bleed out
-                    clipPath(shieldPath) {
-                        // Fill shield with Sky Blue
-                        drawRect(color = skyBlueColor)
-
-                        // Draw top navy arched banner
-                        val topBannerPath = Path().apply {
-                            moveTo(0f, 0f)
-                            lineTo(width, 0f)
-                            lineTo(width, height * 0.38f)
-                            quadraticTo(centerX, height * 0.30f, 0f, height * 0.38f)
-                            close()
-                        }
-                        drawPath(path = topBannerPath, color = navyColor)
-
-                        // Draw golden laurel branches inside the left and right curved borders
-                        val leafPointsLeft = listOf(
-                            Offset(width * 0.18f, height * 0.35f),
-                            Offset(width * 0.18f, height * 0.43f),
-                            Offset(width * 0.19f, height * 0.51f),
-                            Offset(width * 0.22f, height * 0.59f),
-                            Offset(width * 0.27f, height * 0.67f),
-                            Offset(width * 0.34f, height * 0.75f),
-                            Offset(width * 0.42f, height * 0.81f)
-                        )
-                        val leafPointsRight = listOf(
-                            Offset(width * 0.82f, height * 0.35f),
-                            Offset(width * 0.82f, height * 0.43f),
-                            Offset(width * 0.81f, height * 0.51f),
-                            Offset(width * 0.78f, height * 0.59f),
-                            Offset(width * 0.73f, height * 0.67f),
-                            Offset(width * 0.66f, height * 0.75f),
-                            Offset(width * 0.58f, height * 0.81f)
-                        )
-
-                        leafPointsLeft.forEachIndexed { index, pos ->
-                            val angle = -15f - (index * 8f)
-                            rotate(degrees = angle, pivot = pos) {
-                                drawOval(
-                                    color = goldColor,
-                                    topLeft = Offset(pos.x - 4.dp.toPx(), pos.y - 2.dp.toPx()),
-                                    size = androidx.compose.ui.geometry.Size(12.dp.toPx(), 6.dp.toPx())
-                                )
-                            }
-                        }
-
-                        leafPointsRight.forEachIndexed { index, pos ->
-                            val angle = 15f + (index * 8f)
-                            rotate(degrees = angle, pivot = pos) {
-                                drawOval(
-                                    color = goldColor,
-                                    topLeft = Offset(pos.x - 8.dp.toPx(), pos.y - 2.dp.toPx()),
-                                    size = androidx.compose.ui.geometry.Size(12.dp.toPx(), 6.dp.toPx())
-                                )
-                            }
-                        }
-
-                        // Draw a golden key under talons
-                        val keyY = centerY + height * 0.15f
-                        drawLine(
-                            color = goldColor,
-                            start = Offset(centerX - width * 0.18f, keyY),
-                            end = Offset(centerX + width * 0.14f, keyY),
-                            strokeWidth = 3.dp.toPx()
-                        )
-                        drawCircle(
-                            color = goldColor,
-                            center = Offset(centerX + width * 0.17f, keyY),
-                            radius = 5.dp.toPx(),
-                            style = Stroke(width = 2.dp.toPx())
-                        )
-                        drawLine(
-                            color = goldColor,
-                            start = Offset(centerX - width * 0.13f, keyY),
-                            end = Offset(centerX - width * 0.13f, keyY + 6.dp.toPx()),
-                            strokeWidth = 3.dp.toPx()
-                        )
-                        drawLine(
-                            color = goldColor,
-                            start = Offset(centerX - width * 0.08f, keyY),
-                            end = Offset(centerX - width * 0.08f, keyY + 6.dp.toPx()),
-                            strokeWidth = 3.dp.toPx()
-                        )
-
-                        // Draw stylized silver-white eagle
-                        val eagleColor = Color(0xFFF1F5F9)
-                        val wingPathLeft = Path().apply {
-                            moveTo(centerX, centerY + height * 0.02f)
-                            lineTo(centerX - width * 0.28f, centerY - height * 0.02f)
-                            lineTo(centerX - width * 0.18f, centerY + height * 0.08f)
-                            lineTo(centerX - width * 0.08f, centerY + height * 0.06f)
-                            lineTo(centerX, centerY + height * 0.12f)
-                            close()
-                        }
-                        val wingPathRight = Path().apply {
-                            moveTo(centerX, centerY + height * 0.02f)
-                            lineTo(centerX + width * 0.28f, centerY - height * 0.02f)
-                            lineTo(centerX + width * 0.18f, centerY + height * 0.08f)
-                            lineTo(centerX + width * 0.08f, centerY + height * 0.06f)
-                            lineTo(centerX, centerY + height * 0.12f)
-                            close()
-                        }
-                        val eagleChestAndHeadPath = Path().apply {
-                            moveTo(centerX - width * 0.04f, centerY + height * 0.12f)
-                            lineTo(centerX - width * 0.04f, centerY + height * 0.02f)
-                            cubicTo(
-                                centerX - width * 0.04f, centerY - height * 0.05f,
-                                centerX - width * 0.10f, centerY - height * 0.02f,
-                                centerX - width * 0.10f, centerY - height * 0.02f
-                            )
-                            lineTo(centerX - width * 0.07f, centerY)
-                            lineTo(centerX, centerY + height * 0.02f)
-                            lineTo(centerX + width * 0.04f, centerY + height * 0.02f)
-                            lineTo(centerX + width * 0.04f, centerY + height * 0.12f)
-                            close()
-                        }
-
-                        drawPath(path = wingPathLeft, color = eagleColor)
-                        drawPath(path = wingPathRight, color = eagleColor)
-                        drawPath(path = eagleChestAndHeadPath, color = eagleColor)
-
-                        // Draw Texts using Native Canvas
-                        drawIntoCanvas { canvas ->
-                            // 1. "SECURITY" curved at the top
-                            val securityPaint = android.graphics.Paint().apply {
-                                color = goldColor.toArgb()
-                                textSize = (width * 0.07f).coerceIn(10f, 40f)
-                                typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
-                                textAlign = android.graphics.Paint.Align.CENTER
-                                isAntiAlias = true
-                            }
-                            val textPath = android.graphics.Path().apply {
-                                moveTo(width * 0.22f, height * 0.24f)
-                                quadTo(centerX, height * 0.14f, width * 0.78f, height * 0.24f)
-                            }
-                            canvas.nativeCanvas.drawTextOnPath("SECURITY", textPath, 0f, 0f, securityPaint)
-
-                            // 2. "NDS" bold in the center with dark navy stroke
-                            val ndsTextY = centerY - height * 0.05f
-                            val ndsStrokePaint = android.graphics.Paint().apply {
-                                color = navyColor.toArgb()
-                                textSize = (width * 0.18f).coerceIn(20f, 90f)
-                                style = android.graphics.Paint.Style.STROKE
-                                strokeWidth = 3.dp.toPx()
-                                typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
-                                textAlign = android.graphics.Paint.Align.CENTER
-                                isAntiAlias = true
-                            }
-                            canvas.nativeCanvas.drawText("NDS", centerX, ndsTextY, ndsStrokePaint)
-
-                            val ndsFillPaint = android.graphics.Paint().apply {
-                                color = Color.White.toArgb()
-                                textSize = (width * 0.18f).coerceIn(20f, 90f)
-                                style = android.graphics.Paint.Style.FILL
-                                typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
-                                textAlign = android.graphics.Paint.Align.CENTER
-                                isAntiAlias = true
-                            }
-                            canvas.nativeCanvas.drawText("NDS", centerX, ndsTextY, ndsFillPaint)
-
-                            // 3. "NIGHTDAY SECURITY" at the bottom curve
-                            val bottomTextPaint = android.graphics.Paint().apply {
-                                color = Color.White.toArgb()
-                                textSize = (width * 0.055f).coerceIn(8f, 30f)
-                                typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
-                                textAlign = android.graphics.Paint.Align.CENTER
-                                isAntiAlias = true
-                            }
-                            val bottomTextPath = android.graphics.Path().apply {
-                                moveTo(width * 0.20f, height * 0.70f)
-                                quadTo(centerX, height * 0.88f, width * 0.80f, height * 0.70f)
-                            }
-                            canvas.nativeCanvas.drawTextOnPath("NIGHTDAY SECURITY", bottomTextPath, 0f, 0f, bottomTextPaint)
-                        }
-
-                        // Draw golden scroll rect at the bottom tip
-                        drawRoundRect(
-                            color = goldColor,
-                            topLeft = Offset(centerX - 8.dp.toPx(), height * 0.87f),
-                            size = androidx.compose.ui.geometry.Size(16.dp.toPx(), 6.dp.toPx()),
-                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx(), 2.dp.toPx())
-                        )
-                    }
-                }
-            }
-        }
-    )
-}
-
 // -----------------------------------------------------------------------------
-// REGISTRATION-FREE WIZARD (FIRST TIME SETUP)
+// REGISTRATION-FREE WIZARD (FIRST TIME SETUP & SELF-ACTIVATION)
 // -----------------------------------------------------------------------------
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FirstTimeSetupScreen(cccd: String, viewModel: SecurityViewModel) {
     val preassignedRole by viewModel.pendingRegistrationRole.collectAsStateWithLifecycle()
-    val finalRole = preassignedRole ?: "CAPTAIN"
+    var selectedRole by remember(preassignedRole) { mutableStateOf(preassignedRole ?: "CAPTAIN") }
 
+    var cccdInput by remember(cccd) { mutableStateOf(cccd) }
     var fullName by remember { mutableStateOf("") }
     var passwordInput by remember { mutableStateOf("") }
+    var locationInput by remember { mutableStateOf("Trụ sở Ngày & Đêm Security") }
     val loginError by viewModel.loginError.collectAsStateWithLifecycle()
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(24.dp),
+            .padding(20.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .widthIn(max = 450.dp),
+                .widthIn(max = 500.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Icon(
                 imageVector = Icons.Default.AdminPanelSettings,
                 contentDescription = "Setup Profile",
-                tint = MaterialTheme.colorScheme.tertiary,
-                modifier = Modifier.size(72.dp)
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(68.dp)
             )
 
             Text(
-                text = "THIẾT LẬP HỒ SƠ LẦN ĐẦU",
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                text = "KÍCH HOẠT & THIẾT LẬP CCCD",
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
                 color = MaterialTheme.colorScheme.primary,
                 textAlign = TextAlign.Center
             )
 
             Text(
-                text = "CCCD $cccd đã được Admin cấp quyền trên hệ thống. Vui lòng cung cấp thêm thông tin cá nhân dưới đây để kích hoạt tài khoản của bạn.",
+                text = "Vui lòng nhập đầy đủ thông tin nhân viên và phân quyền để đăng nhập ngay trên thiết bị này.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
                 textAlign = TextAlign.Center
@@ -607,90 +918,116 @@ fun FirstTimeSetupScreen(cccd: String, viewModel: SecurityViewModel) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                shape = RoundedCornerShape(20.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+                shape = RoundedCornerShape(20.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 Column(
-                    modifier = Modifier.padding(24.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
+                    // CCCD Input
+                    OutlinedTextField(
+                        value = cccdInput,
+                        onValueChange = { input ->
+                            val digits = input.filter { it.isDigit() }
+                            if (digits.length <= 12) {
+                                cccdInput = digits
+                            }
+                        },
+                        label = { Text("Số CCCD (12 chữ số)") },
+                        leadingIcon = { Icon(imageVector = Icons.Default.Badge, contentDescription = "CCCD") },
+                        placeholder = { Text("Nhập đủ 12 chữ số") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
                     // Full Name
                     OutlinedTextField(
                         value = fullName,
                         onValueChange = { fullName = it },
-                        label = { Text("Họ và Tên Của Bạn") },
+                        label = { Text("Họ và Tên Nhân Viên") },
                         leadingIcon = { Icon(imageVector = Icons.Default.Person, contentDescription = "Name") },
-                        placeholder = { Text("Ví dụ: Nguyễn Văn A") },
+                        placeholder = { Text("Ví dụ: Lê Duy Tèo / Nguyễn Văn A") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     )
 
-                    // Pre-assigned Role display
-                    val roleLabel = when (finalRole) {
-                        "CAPTAIN" -> "ĐỘI TRƯỞNG"
-                        "OFFICER" -> "CÁN BỘ NGHIỆP VỤ"
-                        "DISCIPLINE" -> "CÁN BỘ ĐIỀU LỆNH"
-                        else -> finalRole
-                    }
-                    val roleIcon = when (finalRole) {
-                        "CAPTAIN" -> Icons.Default.Security
-                        "OFFICER" -> Icons.Default.SupervisorAccount
-                        "DISCIPLINE" -> Icons.Default.AdminPanelSettings
-                        else -> Icons.Default.Person
-                    }
-                    val roleDesc = when (finalRole) {
-                        "CAPTAIN" -> "Được quyền nộp và quản lý các yêu cầu đề xuất trực tuyến."
-                        "OFFICER" -> "Được quyền phê duyệt và xem xét hồ sơ đề xuất, xử lý chế tài vi phạm."
-                        "DISCIPLINE" -> "Chuyên trách kiểm tra, lập biên bản và quản lý lỗi vi phạm trực tuyến."
-                        else -> ""
-                    }
-                    
+                    // Role Picker
                     Text(
-                        text = "Vai trò đã được Admin phân quyền:",
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        text = "Chọn Phân Quyền Vận Hành:",
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+
+                    val rolesList = listOf(
+                        Triple("ADMIN", "👑 Quản trị viên (Admin)", "Toàn quyền quản trị phân quyền và duyệt hồ sơ"),
+                        Triple("CAPTAIN", "🛡️ Đội trưởng Mục tiêu", "Nộp đơn xin nghỉ phép, đề xuất tăng lương"),
+                        Triple("OFFICER", "📋 Cán bộ Nghiệp vụ", "Phê duyệt đơn đề xuất, xử lý chế tài vi phạm"),
+                        Triple("DISCIPLINE", "⚖️ Cán bộ Điều lệnh", "Kiểm tra và lập biên bản vi phạm tác phong")
+                    )
+
+                    rolesList.forEach { (rCode, rTitle, rDesc) ->
+                        val isSelected = selectedRole == rCode
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { selectedRole = rCode },
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                            ),
+                            border = BorderStroke(
+                                if (isSelected) 2.dp else 1.dp,
+                                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(
-                                imageVector = roleIcon,
-                                contentDescription = roleLabel,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(32.dp)
-                            )
-                            Column {
-                                Text(
-                                    text = roleLabel,
-                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
-                                    color = MaterialTheme.colorScheme.primary
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                RadioButton(
+                                    selected = isSelected,
+                                    onClick = { selectedRole = rCode }
                                 )
-                                Text(
-                                    text = roleDesc,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                Column {
+                                    Text(
+                                        text = rTitle,
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = rDesc,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     }
+
+                    // Assigned location
+                    OutlinedTextField(
+                        value = locationInput,
+                        onValueChange = { locationInput = it },
+                        label = { Text("Mục tiêu / Nơi công tác") },
+                        leadingIcon = { Icon(imageVector = Icons.Default.LocationOn, contentDescription = "Location") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
 
                     // Password entry
                     OutlinedTextField(
                         value = passwordInput,
                         onValueChange = { passwordInput = it },
-                        label = { Text("Tự thiết lập mật khẩu của bạn") },
+                        label = { Text("Mật khẩu Đăng nhập") },
                         leadingIcon = { Icon(imageVector = Icons.Default.LockOpen, contentDescription = "Password") },
-                        placeholder = { Text("Nhập mật khẩu tự chọn để đăng nhập") },
+                        placeholder = { Text("Nhập mật khẩu (ví dụ: 2 hoặc nds123)") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         modifier = Modifier.fillMaxWidth(),
@@ -722,13 +1059,19 @@ fun FirstTimeSetupScreen(cccd: String, viewModel: SecurityViewModel) {
 
                         Button(
                             onClick = {
-                                viewModel.completeFirstTimeSetup(cccd, fullName, finalRole, passwordInput)
+                                viewModel.completeFirstTimeSetup(
+                                    cccd = cccdInput,
+                                    fullName = fullName,
+                                    role = selectedRole,
+                                    passwordEntered = passwordInput,
+                                    location = locationInput
+                                )
                             },
-                            modifier = Modifier.weight(1.5f),
+                            modifier = Modifier.weight(1.6f),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                         ) {
-                            Text("KÍCH HOẠT")
+                            Text("KÍCH HOẠT NGAY", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold))
                         }
                     }
                 }
@@ -757,7 +1100,7 @@ fun CaptainDashboardScreen(user: User, viewModel: SecurityViewModel) {
         modifier = Modifier.fillMaxSize()
     ) {
         // Upper Status Card Hero
-        CaptainHeroSection(user = user, onLogout = { viewModel.logout() })
+        CaptainHeroSection(user = user, viewModel = viewModel, onLogout = { viewModel.logout() })
 
         // Quick action buttons
         Row(
@@ -889,7 +1232,7 @@ fun CaptainDashboardScreen(user: User, viewModel: SecurityViewModel) {
 }
 
 @Composable
-fun CaptainHeroSection(user: User, onLogout: () -> Unit) {
+fun CaptainHeroSection(user: User, viewModel: SecurityViewModel, onLogout: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -1028,7 +1371,7 @@ fun OfficerDashboardScreen(user: User, viewModel: SecurityViewModel) {
         modifier = Modifier.fillMaxSize()
     ) {
         // Upper Profile Bar
-        OfficerHeader(user = user, onLogout = { viewModel.logout() })
+        OfficerHeader(user = user, viewModel = viewModel, onLogout = { viewModel.logout() })
 
         // Tab Row switcher
         TabRow(
@@ -1191,7 +1534,7 @@ fun DisciplineDashboardScreen(user: User, viewModel: SecurityViewModel) {
         modifier = Modifier.fillMaxSize()
     ) {
         // Upper Header
-        DisciplineHeader(user = user, onLogout = { viewModel.logout() })
+        DisciplineHeader(user = user, viewModel = viewModel, onLogout = { viewModel.logout() })
 
         // Quick Stats Row
         Row(
@@ -1255,7 +1598,7 @@ fun DisciplineDashboardScreen(user: User, viewModel: SecurityViewModel) {
 }
 
 @Composable
-fun DisciplineHeader(user: User, onLogout: () -> Unit) {
+fun DisciplineHeader(user: User, viewModel: SecurityViewModel, onLogout: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -1961,7 +2304,7 @@ fun ViolationItemCard(
 }
 
 @Composable
-fun OfficerHeader(user: User, onLogout: () -> Unit) {
+fun OfficerHeader(user: User, viewModel: SecurityViewModel, onLogout: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -2216,6 +2559,8 @@ fun AdminDashboardScreen(user: User, viewModel: SecurityViewModel) {
 
         if (activeTab == 0) {
             // User role assignment management list
+            var editingUser by remember { mutableStateOf<User?>(null) }
+
             Box(modifier = Modifier.weight(1f)) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     Row(
@@ -2225,10 +2570,17 @@ fun AdminDashboardScreen(user: User, viewModel: SecurityViewModel) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "Danh Sách CCCD Hệ Thống (${users.size})",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                        )
+                        Column {
+                            Text(
+                                text = "Danh Sách Tài Khoản Nhân Viên (${users.size})",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                            )
+                            Text(
+                                text = "Quản lý và cấp quyền đăng nhập toàn hệ thống",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
 
                         Button(
                             onClick = { showAddUserDialog = true },
@@ -2248,14 +2600,32 @@ fun AdminDashboardScreen(user: User, viewModel: SecurityViewModel) {
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(users) { usr ->
-                            UserRoleItemCard(user = usr, onRoleChange = { newRole ->
-                                viewModel.updateUserRole(usr.cccd, newRole)
-                            }, onDelete = {
-                                viewModel.deleteUser(usr)
-                            })
+                            UserRoleItemCard(
+                                user = usr,
+                                onRoleChange = { newRole ->
+                                    viewModel.updateUserRole(usr.cccd, newRole)
+                                },
+                                onEdit = {
+                                    editingUser = usr
+                                },
+                                onDelete = {
+                                    viewModel.deleteUser(usr)
+                                }
+                            )
                         }
                     }
                 }
+            }
+
+            if (editingUser != null) {
+                EditUserDialog(
+                    user = editingUser!!,
+                    onDismiss = { editingUser = null },
+                    onSubmit = { updated ->
+                        viewModel.updateUserDetails(updated)
+                        editingUser = null
+                    }
+                )
             }
         } else {
             // Comprehensive history overview of all system proposals
@@ -2334,6 +2704,7 @@ fun AdminDashboardScreen(user: User, viewModel: SecurityViewModel) {
 fun UserRoleItemCard(
     user: User,
     onRoleChange: (String) -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     Card(
@@ -2430,18 +2801,18 @@ fun UserRoleItemCard(
                         )
                         Text(
                             text = "CCCD: ${user.cccd}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.Gray
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.primary
                         )
                         val displayPassword = if (user.password.isBlank()) {
-                            "Mật khẩu: Chưa tạo (Tự thiết lập khi đăng nhập)"
+                            "Mật khẩu: Chưa tạo (Tự tạo khi đăng nhập)"
                         } else {
                             "Mật khẩu: ${user.password}"
                         }
                         val pwdColor = if (user.password.isBlank()) {
                             MaterialTheme.colorScheme.tertiary
                         } else {
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                            MaterialTheme.colorScheme.onSurfaceVariant
                         }
                         Text(
                             text = displayPassword,
@@ -2456,7 +2827,7 @@ fun UserRoleItemCard(
                             else -> if (user.assignedLocation.isBlank()) {
                                 "Mục tiêu quản lý: Chưa thiết lập"
                             } else {
-                                "Mục tiêu quản lý: ${user.assignedLocation}"
+                                "Mục tiêu: ${user.assignedLocation}"
                             }
                         }
                         Text(
@@ -2467,12 +2838,21 @@ fun UserRoleItemCard(
                     }
                 }
 
-                if (user.cccd != "000000000000") {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     IconButton(
-                        onClick = onDelete,
-                        modifier = Modifier.background(MaterialTheme.colorScheme.error.copy(alpha = 0.1f), CircleShape)
+                        onClick = onEdit,
+                        modifier = Modifier.background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f), CircleShape)
                     ) {
-                        Icon(imageVector = Icons.Default.Delete, contentDescription = "Xóa", tint = MaterialTheme.colorScheme.error)
+                        Icon(imageVector = Icons.Default.Edit, contentDescription = "Chỉnh sửa", tint = MaterialTheme.colorScheme.primary)
+                    }
+
+                    if (user.cccd != "000000000000" && user.cccd != "087095015873") {
+                        IconButton(
+                            onClick = onDelete,
+                            modifier = Modifier.background(MaterialTheme.colorScheme.error.copy(alpha = 0.1f), CircleShape)
+                        ) {
+                            Icon(imageVector = Icons.Default.Delete, contentDescription = "Xóa", tint = MaterialTheme.colorScheme.error)
+                        }
                     }
                 }
             }
@@ -2481,16 +2861,16 @@ fun UserRoleItemCard(
             Divider()
             Spacer(modifier = Modifier.height(12.dp))
 
-            Text("Phân quyền vai trò:", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
+            Text("Phân quyền vai trò trực tiếp:", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
             Spacer(modifier = Modifier.height(8.dp))
 
-            if (user.cccd == "000000000000") {
+            if (user.cccd == "000000000000" || user.cccd == "087095015873") {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        "Tài khoản Admin hệ thống cố định",
+                        "👑 Quản trị viên Tối cao Toàn quyền",
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                         modifier = Modifier.padding(12.dp),
                         color = MaterialTheme.colorScheme.onTertiaryContainer
@@ -2513,16 +2893,24 @@ fun UserRoleItemCard(
                     ElevatedFilterChip(
                         selected = user.role == "OFFICER",
                         onClick = { onRoleChange("OFFICER") },
-                        label = { Text("CB Nghiệp Vụ", style = MaterialTheme.typography.bodySmall) },
-                        modifier = Modifier.weight(1.3f)
+                        label = { Text("Nghiệp Vụ", style = MaterialTheme.typography.bodySmall) },
+                        modifier = Modifier.weight(1.1f)
                     )
 
                     // Discipline Officer Role Toggle
                     ElevatedFilterChip(
                         selected = user.role == "DISCIPLINE",
                         onClick = { onRoleChange("DISCIPLINE") },
-                        label = { Text("CB Điều Lệnh", style = MaterialTheme.typography.bodySmall) },
-                        modifier = Modifier.weight(1.3f)
+                        label = { Text("Điều Lệnh", style = MaterialTheme.typography.bodySmall) },
+                        modifier = Modifier.weight(1.1f)
+                    )
+
+                    // Admin Role Toggle
+                    ElevatedFilterChip(
+                        selected = user.role == "ADMIN",
+                        onClick = { onRoleChange("ADMIN") },
+                        label = { Text("Admin", style = MaterialTheme.typography.bodySmall) },
+                        modifier = Modifier.weight(0.9f)
                     )
                 }
             }
@@ -4996,10 +5384,10 @@ fun AddNewUserDialog(
     var cccd by remember { mutableStateOf("") }
     var fullName by remember { mutableStateOf("") }
     var assignedLocation by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("nds123") }
     var role by remember { mutableStateOf("CAPTAIN") }
 
-    val isFormValid = cccd.length == 12 && fullName.isNotBlank() && password.isNotBlank() && (role != "CAPTAIN" || assignedLocation.isNotBlank())
+    val isFormValid = cccd.length == 12 && fullName.isNotBlank()
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -5022,21 +5410,12 @@ fun AddNewUserDialog(
                     modifier = Modifier.align(Alignment.CenterHorizontally)
                 )
 
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text(
-                        text = if (role == "CAPTAIN") {
-                            "Cấp quyền Đội trưởng: Vui lòng nhập thông tin cá nhân và Mục tiêu quản lý được phân công."
-                        } else {
-                            "Cấp quyền Cán bộ: Nhập CCCD, Họ tên và Mật khẩu (không cần nhập Mục tiêu quản lý)."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(12.dp)
-                    )
-                }
+                Text(
+                    text = "Nhập thông tin nhân viên mới để cấp quyền đăng nhập hệ thống.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
 
                 // CCCD
                 OutlinedTextField(
@@ -5044,7 +5423,7 @@ fun AddNewUserDialog(
                     onValueChange = { input ->
                         if (input.all { it.isDigit() } && input.length <= 12) cccd = input
                     },
-                    label = { Text("Số CCCD (12 chữ số)") },
+                    label = { Text("Số CCCD (12 chữ số) *") },
                     placeholder = { Text("Ví dụ: 123456789012") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -5056,7 +5435,7 @@ fun AddNewUserDialog(
                 OutlinedTextField(
                     value = fullName,
                     onValueChange = { fullName = it },
-                    label = { Text("Họ và Tên") },
+                    label = { Text("Họ và Tên Nhân Viên *") },
                     placeholder = { Text("Ví dụ: Nguyễn Văn C") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().testTag("add_user_fullname"),
@@ -5066,27 +5445,34 @@ fun AddNewUserDialog(
                 Text("Vai trò phân quyền:", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     ElevatedFilterChip(
                         selected = role == "CAPTAIN",
                         onClick = { role = "CAPTAIN" },
-                        label = { Text("Đội Trưởng", style = MaterialTheme.typography.bodySmall) },
+                        label = { Text("Đội Trưởng", style = MaterialTheme.typography.labelSmall) },
                         modifier = Modifier.weight(1f)
                     )
 
                     ElevatedFilterChip(
                         selected = role == "OFFICER",
                         onClick = { role = "OFFICER" },
-                        label = { Text("CB Nghiệp Vụ", style = MaterialTheme.typography.bodySmall) },
-                        modifier = Modifier.weight(1.5f)
+                        label = { Text("Nghiệp Vụ", style = MaterialTheme.typography.labelSmall) },
+                        modifier = Modifier.weight(1f)
                     )
 
                     ElevatedFilterChip(
                         selected = role == "DISCIPLINE",
                         onClick = { role = "DISCIPLINE" },
-                        label = { Text("CB Điều Lệnh", style = MaterialTheme.typography.bodySmall) },
-                        modifier = Modifier.weight(1.5f)
+                        label = { Text("Điều Lệnh", style = MaterialTheme.typography.labelSmall) },
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    ElevatedFilterChip(
+                        selected = role == "ADMIN",
+                        onClick = { role = "ADMIN" },
+                        label = { Text("Admin", style = MaterialTheme.typography.labelSmall) },
+                        modifier = Modifier.weight(0.9f)
                     )
                 }
 
@@ -5095,7 +5481,7 @@ fun AddNewUserDialog(
                     OutlinedTextField(
                         value = assignedLocation,
                         onValueChange = { assignedLocation = it },
-                        label = { Text("Mục tiêu quản lý / Vận hành *") },
+                        label = { Text("Mục tiêu quản lý / Nơi làm việc") },
                         placeholder = { Text("Ví dụ: Ngày & Đêm Security, Landmark 81...") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth().testTag("add_user_location"),
@@ -5107,8 +5493,8 @@ fun AddNewUserDialog(
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
-                    label = { Text("Mật khẩu") },
-                    placeholder = { Text("Nhập mật khẩu cho tài khoản") },
+                    label = { Text("Mật khẩu Đăng nhập") },
+                    placeholder = { Text("Mặc định: nds123 (hoặc tùy chỉnh)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().testTag("add_user_password"),
                     shape = RoundedCornerShape(12.dp)
@@ -5130,11 +5516,12 @@ fun AddNewUserDialog(
                         onClick = {
                             if (isFormValid) {
                                 val finalLocation = when (role) {
+                                    "ADMIN" -> "Trụ sở chính Ngày & Đêm"
                                     "OFFICER" -> "Phòng Nghiệp vụ"
                                     "DISCIPLINE" -> "Phòng Điều lệnh"
-                                    else -> assignedLocation.trim()
+                                    else -> assignedLocation.trim().ifBlank { "Ngày & Đêm Security" }
                                 }
-                                onSubmit(cccd, fullName, role, password, finalLocation)
+                                onSubmit(cccd, fullName, role, password.trim().ifBlank { "nds123" }, finalLocation)
                             }
                         },
                         modifier = Modifier.weight(1.5f),
@@ -5142,6 +5529,142 @@ fun AddNewUserDialog(
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Text("XÁC NHẬN")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EditUserDialog(
+    user: User,
+    onDismiss: () -> Unit,
+    onSubmit: (User) -> Unit
+) {
+    var fullName by remember { mutableStateOf(user.fullName) }
+    var assignedLocation by remember { mutableStateOf(user.assignedLocation) }
+    var password by remember { mutableStateOf(user.password) }
+    var role by remember { mutableStateOf(user.role) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text(
+                    text = "CHỈNH SỬA TÀI KHOẢN",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
+
+                Text(
+                    text = "CCCD: ${user.cccd}",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
+
+                // Full Name
+                OutlinedTextField(
+                    value = fullName,
+                    onValueChange = { fullName = it },
+                    label = { Text("Họ và Tên Nhân Viên *") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Text("Vai trò phân quyền:", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    ElevatedFilterChip(
+                        selected = role == "CAPTAIN",
+                        onClick = { role = "CAPTAIN" },
+                        label = { Text("Đội Trưởng", style = MaterialTheme.typography.labelSmall) },
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    ElevatedFilterChip(
+                        selected = role == "OFFICER",
+                        onClick = { role = "OFFICER" },
+                        label = { Text("Nghiệp Vụ", style = MaterialTheme.typography.labelSmall) },
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    ElevatedFilterChip(
+                        selected = role == "DISCIPLINE",
+                        onClick = { role = "DISCIPLINE" },
+                        label = { Text("Điều Lệnh", style = MaterialTheme.typography.labelSmall) },
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    ElevatedFilterChip(
+                        selected = role == "ADMIN",
+                        onClick = { role = "ADMIN" },
+                        label = { Text("Admin", style = MaterialTheme.typography.labelSmall) },
+                        modifier = Modifier.weight(0.9f)
+                    )
+                }
+
+                // Assigned Location
+                OutlinedTextField(
+                    value = assignedLocation,
+                    onValueChange = { assignedLocation = it },
+                    label = { Text("Mục tiêu / Nơi công tác") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                // Password
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Mật khẩu Đăng nhập") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("HỦY")
+                    }
+
+                    Button(
+                        onClick = {
+                            val updated = user.copy(
+                                fullName = fullName.trim(),
+                                role = role,
+                                password = password.trim(),
+                                assignedLocation = assignedLocation.trim()
+                            )
+                            onSubmit(updated)
+                        },
+                        modifier = Modifier.weight(1.5f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("LƯU THAY ĐỔI")
                     }
                 }
             }

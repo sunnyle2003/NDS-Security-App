@@ -15,6 +15,9 @@ interface ProposalDao {
     @Query("SELECT * FROM proposals WHERE id = :id LIMIT 1")
     suspend fun getProposalById(id: Int): Proposal?
 
+    @Query("SELECT * FROM proposals WHERE proposerCccd = :proposerCccd AND timestamp = :timestamp LIMIT 1")
+    suspend fun getProposalByProposerAndTimestamp(proposerCccd: String, timestamp: Long): Proposal?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertProposal(proposal: Proposal)
 

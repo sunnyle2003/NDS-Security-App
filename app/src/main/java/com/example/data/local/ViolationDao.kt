@@ -15,6 +15,9 @@ interface ViolationDao {
     @Query("SELECT * FROM violations WHERE id = :id LIMIT 1")
     suspend fun getViolationById(id: Int): Violation?
 
+    @Query("SELECT * FROM violations WHERE reporterCccd = :reporterCccd AND timestamp = :timestamp LIMIT 1")
+    suspend fun getViolationByReporterAndTimestamp(reporterCccd: String, timestamp: Long): Violation?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertViolation(violation: Violation)
 

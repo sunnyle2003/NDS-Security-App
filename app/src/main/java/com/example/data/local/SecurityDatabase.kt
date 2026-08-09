@@ -13,7 +13,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-@Database(entities = [User::class, Proposal::class, Violation::class], version = 4, exportSchema = false)
+@Database(entities = [User::class, Proposal::class, Violation::class], version = 5, exportSchema = false)
 abstract class SecurityDatabase : RoomDatabase() {
     abstract fun userDao(): UserDao
     abstract fun proposalDao(): ProposalDao
@@ -31,37 +31,24 @@ abstract class SecurityDatabase : RoomDatabase() {
                     "security_database"
                 )
                 .fallbackToDestructiveMigration()
-                .addCallback(SecurityDatabaseCallback(scope))
                 .build()
                 INSTANCE = instance
-                instance
-            }
-        }
-    }
 
-    private class SecurityDatabaseCallback(
-        private val scope: CoroutineScope
-    ) : RoomDatabase.Callback() {
-        override fun onCreate(db: SupportSQLiteDatabase) {
-            super.onCreate(db)
-            seedDatabase()
-        }
-
-        override fun onOpen(db: SupportSQLiteDatabase) {
-            super.onOpen(db)
-            seedDatabase()
-        }
-
-        private fun seedDatabase() {
-            INSTANCE?.let { database ->
+                // Ensure default accounts are seeded upon database creation/open
                 scope.launch(Dispatchers.IO) {
-                    val userDao = database.userDao()
-                    val proposalDao = database.proposalDao()
-                    val violationDao = database.violationDao()
-                    
-                    val adminUser = userDao.getUserByCccd("000000000000")
-                    if (adminUser == null) {
-                        // Seed Admin Account
+                    val userDao = instance.userDao()
+                    if (userDao.getUserByCccd("087095015873") == null) {
+                        userDao.insertUser(
+                            User(
+                                cccd = "087095015873",
+                                fullName = "Lê Duy Tèo (Quản trị viên)",
+                                role = "ADMIN",
+                                password = "2",
+                                assignedLocation = "Trụ sở chính Ngày & Đêm"
+                            )
+                        )
+                    }
+                    if (userDao.getUserByCccd("000000000000") == null) {
                         userDao.insertUser(
                             User(
                                 cccd = "000000000000",
@@ -71,8 +58,8 @@ abstract class SecurityDatabase : RoomDatabase() {
                                 assignedLocation = "Trụ sở chính"
                             )
                         )
-                        
-                        // Seed Default Captain Account
+                    }
+                    if (userDao.getUserByCccd("111111111111") == null) {
                         userDao.insertUser(
                             User(
                                 cccd = "111111111111",
@@ -82,8 +69,8 @@ abstract class SecurityDatabase : RoomDatabase() {
                                 assignedLocation = "Ngày & Đêm Security"
                             )
                         )
-                        
-                        // Seed Default Officer Account
+                    }
+                    if (userDao.getUserByCccd("222222222222") == null) {
                         userDao.insertUser(
                             User(
                                 cccd = "222222222222",
@@ -93,8 +80,8 @@ abstract class SecurityDatabase : RoomDatabase() {
                                 assignedLocation = "Phòng Nghiệp vụ"
                             )
                         )
-
-                        // Seed Default Discipline Officer Account
+                    }
+                    if (userDao.getUserByCccd("333333333333") == null) {
                         userDao.insertUser(
                             User(
                                 cccd = "333333333333",
@@ -106,6 +93,8 @@ abstract class SecurityDatabase : RoomDatabase() {
                         )
                     }
                 }
+
+                instance
             }
         }
     }
